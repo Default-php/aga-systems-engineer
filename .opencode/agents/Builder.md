@@ -1,7 +1,7 @@
 ---
 description: Implements code changes, builds components, and solves concrete technical tasks.
 mode: subagent
-model: opencode-go/gpt-5.6-luna
+model: opencode-go/deepseek-v4-flash
 temperature: 0.3
 steps: 10
 permission:

@@ -1,15 +1,7 @@
 ---
 description: Reviews the builder's work for architecture issues, bugs, edge cases, missing tests, and general quality. Read-only — never edits code, only reports findings.
 mode: subagent
-# Current model: opencode/deepseek-v4-flash-free
-# NOTE: this agent deliberately runs on a lighter/cheaper model than `builder`,
-# because it processes the largest volume of tokens (it reads full diffs on
-# every single task). To compensate for lower reasoning capacity, the prompt
-# below is written as an explicit, fixed procedure instead of open-ended
-# instructions. Keep it that way even if you swap the model later — a stronger
-# model will simply execute the same checklist faster and more reliably.
-# Update ONLY the model field below when swapping providers/models.
-model: opencode/deepseek-v4-flash-free
+model: opencode-go/gpt-5.6-luna
 temperature: 0.1
 steps: 14
 permission:
