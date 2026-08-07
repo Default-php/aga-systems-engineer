@@ -1,0 +1,22 @@
+{
+  "name": "portfolio",
+  "version": "1.0.0",
+  "description": "Modern Django portfolio showcasing AI integration, cloud infrastructure, DevOps, and systems engineering projects.",
+  "main": "index.js",
+  "scripts": {
+    "test": "hola"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Default-php/aga-systems-engineer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Default-php/aga-systems-engineer/issues"
+  },
+  "homepage": "https://github.com/Default-php/aga-systems-engineer#readme",
+  "dependencies": {
+    "gsap": "^3.15.0"
+  }
+}
