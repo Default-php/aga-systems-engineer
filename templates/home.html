@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Alfonso González Arellano — Systems Engineer{% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page">
+      <div class="flex flex-wrap gap-2">
+        <span class="badge">Python</span>
+        <span class="badge">Django</span>
+        <span class="badge">Docker</span>
+        <span class="badge">Linux</span>
+        <span class="badge">Cloud</span>
+        <span class="badge">DevOps</span>
+      </div>
+      <h1 class="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">Alfonso González Arellano</h1>
+      <p class="mt-4 text-xl text-ink-muted sm:text-2xl">Systems Engineer</p>
+      <p class="mt-4 max-w-2xl text-ink-muted">AI integration · Cloud infrastructure · Automation — built with Python &amp; Django.</p>
+      <div class="mt-8 flex gap-4">
+        <a href="#projects" class="btn btn-primary">View projects</a>
+        <a href="#contact" class="btn btn-ghost">Get in touch</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="container-page">
+      <h2 class="mb-6 text-2xl font-semibold">About</h2>
+      <div class="max-w-3xl text-ink-muted">
+        <p>Systems Engineer focused on AI integration, cloud computing, and infrastructure automation. I design and operate reliable systems — from Linux and Windows administration to Active Directory and containerized workloads.</p>
+        <p class="mt-4">I build with Python, Django, and REST APIs, and I treat infrastructure as code: reproducible, automated, and observable.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="expertise">
+    <div class="container-page">
+      <h2 class="mb-6 text-2xl font-semibold">What I do</h2>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="card">
+          <h3 class="font-medium">AI Integration</h3>
+          <p class="mt-2 text-sm text-ink-muted">Practical AI integration and implementation in real products and workflows.</p>
+        </div>
+        <div class="card">
+          <h3 class="font-medium">Cloud Computing</h3>
+          <p class="mt-2 text-sm text-ink-muted">Cloud architecture and deployment — designed for cost, reliability, and scale.</p>
+        </div>
+        <div class="card">
+          <h3 class="font-medium">Docker &amp; Automation</h3>
+          <p class="mt-2 text-sm text-ink-muted">Containerized workloads, CI/CD pipelines, and infrastructure as code.</p>
+        </div>
+        <div class="card">
+          <h3 class="font-medium">Systems Administration</h3>
+          <p class="mt-2 text-sm text-ink-muted">Linux &amp; Windows administration, Active Directory, and hardening.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="projects">
+    <div class="container-page">
+      <h2 class="mb-6 text-2xl font-semibold">Featured projects</h2>
+      <div class="grid gap-6 md:grid-cols-3">
+        {# Phase 2 replaces this view-provided placeholder data with apps.projects DB content #}
+        {% for project in projects %}
+          {% include "components/project_card.html" with title=project.title description=project.description tags=project.tags url=project.url %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="contact">
+    <div class="container-page">
+      <div class="mx-auto max-w-xl text-center">
+        <h2 class="text-2xl font-semibold">Let's build something reliable</h2>
+        <p class="mt-4 text-ink-muted">Available for AI integration, cloud, and infrastructure projects.</p>
+        <a href="mailto:alfonso.ga@proton.me" class="btn btn-primary mt-6">alfonso.ga@proton.me</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Alfonso González Arellano — Systems Engineer{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'css/dist/app.css' %}">
+</head>
+<body>
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
+  {% include "components/navbar.html" %}
+  <main id="main">{% block content %}{% endblock %}</main>
+  {% include "components/footer.html" %}
+  <script src="{% static 'js/nav.js' %}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

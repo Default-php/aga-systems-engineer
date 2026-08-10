@@ -73,6 +73,40 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Reusable components
+--------------------------------------------------------------------------- */
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section {
+    @apply py-16 sm:py-24;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-on-accent hover:bg-accent-strong;
+  }
+
+  .btn-ghost {
+    @apply border border-edge text-ink hover:bg-surface-2;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border border-edge px-3 py-1 text-xs font-medium text-ink-muted;
+  }
+
+  .card {
+    @apply rounded-lg border border-edge bg-surface-2 p-6;
+  }
+}
+
 /* Respect OS-level reduced-motion preference (PROJECT.md: accessibility). */
 @media (prefers-reduced-motion: reduce) {
   *,

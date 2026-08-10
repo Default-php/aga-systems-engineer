@@ -1,0 +1,27 @@
+<header class="sticky top-0 z-50 border-b border-edge bg-surface/80 backdrop-blur">
+  <div class="container-page flex h-16 items-center justify-between">
+    <a href="/" class="max-w-[60vw] truncate font-semibold sm:max-w-none">Alfonso González Arellano</a>
+    <nav class="hidden gap-6 text-sm md:flex" aria-label="Main navigation">
+      <a href="/" class="text-ink-muted transition-colors hover:text-ink">Home</a>
+      <a href="#about" class="text-ink-muted transition-colors hover:text-ink">About</a>
+      <a href="#projects" class="text-ink-muted transition-colors hover:text-ink">Projects</a>
+      <a href="#contact" class="text-ink-muted transition-colors hover:text-ink">Contact</a>
+    </nav>
+    <div class="flex items-center gap-2">
+      {% include "components/theme_toggle.html" %}
+      <button type="button" id="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Toggle navigation menu" class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-edge text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink md:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div id="nav-menu" class="hidden border-t border-edge bg-surface md:hidden">
+    <nav aria-label="Mobile">
+      <a href="/" class="block px-4 py-3 text-ink-muted hover:bg-surface-2">Home</a>
+      <a href="#about" class="block px-4 py-3 text-ink-muted hover:bg-surface-2">About</a>
+      <a href="#projects" class="block px-4 py-3 text-ink-muted hover:bg-surface-2">Projects</a>
+      <a href="#contact" class="block px-4 py-3 text-ink-muted hover:bg-surface-2">Contact</a>
+    </nav>
+  </div>
+</header>
