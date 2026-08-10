@@ -3,7 +3,6 @@
 Professional portfolio built with Django — designed as a showcase project demonstrating
 Django, Docker, AI integration, cloud deployment, and infrastructure automation.
 
-## Technologies
 
 - Python 3.12 / Django 6.0
 - Django templates + Tailwind CSS + GSAP (frontend)

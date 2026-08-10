@@ -1,12 +1,11 @@
 ---
-description: Coordinates the job, breaks it into concrete steps, and delegates work to the right agents.
+description: Coordinates the job, breaks it into concrete steps, and delegates work to the right agents, DOESN'T WORK BY ITSELF, DOESN'T EDIT, DOESN'T REVIEW.
 mode: primary
 model: opencode-go/qwen3.8-max
 temperature: 0.2
-steps: 8
 permission:
   task: allow
-  edit: ask
+  edit: deny
   shell: ask
   subagent: allow
 color: "#3162B0"

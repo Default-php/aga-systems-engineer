@@ -3,7 +3,6 @@ name: gsap
 description: Use when you need to add or debug professional web animations with GSAP (timelines, ScrollTrigger, stagger, transforms) in HTML/CSS/JS/React. Includes patterns for smooth motion, performance, and common pitfalls.
 ---
 
-# GSAP (GreenSock) — Web Animation Skill
 
 ## When to use
 - High-quality UI/motion design: entrances, micro-interactions, page transitions

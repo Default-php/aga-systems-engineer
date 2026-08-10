@@ -3,7 +3,6 @@ description: Reviews the builder's work for architecture issues, bugs, edge case
 mode: subagent
 model: opencode-go/gpt-5.6-luna
 temperature: 0.1
-steps: 14
 permission:
   task:
     "*": deny

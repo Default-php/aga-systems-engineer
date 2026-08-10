@@ -3,7 +3,6 @@ name: css-border-gradient
 description: Apply subtle gradient-border treatments for premium web surfaces. Use when cards, pricing panels, nav bars, modals, buttons, or hero surfaces need a refined edge highlight without a loud glow.
 ---
 
-# Border Gradients
 
 ## Use When
 - A surface needs a more premium edge than a flat `border`.

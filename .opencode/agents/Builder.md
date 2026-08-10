@@ -3,7 +3,6 @@ description: Implements code changes, builds components, and solves concrete tec
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 temperature: 0.3
-steps: 10
 permission:
   task: deny
   edit: allow

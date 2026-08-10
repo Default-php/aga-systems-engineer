@@ -3,7 +3,6 @@ name: using-sqlite
 description: Use when working with SQLite databases in DataPeeker analysis sessions - querying data, importing CSVs, exploring schemas, formatting output, or optimizing performance. Provides task-oriented guidance for effective SQLite CLI usage in data analysis workflows.
 ---
 
-# Using SQLite
 
 ## Overview
 
