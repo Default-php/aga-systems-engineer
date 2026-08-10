@@ -6,6 +6,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Alfonso González Arellano — Systems Engineer{% endblock %}</title>
   {% block meta %}{% endblock %}
+    <script>
+      (function () {
+        var dark;
+        try {
+          var mode = localStorage.getItem("theme");
+          if (mode !== "light" && mode !== "dark" && mode !== "system") {
+            mode = "system";
+          }
+          dark =
+            mode === "dark" ||
+            (mode === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+        } catch (e) {
+          dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
   <link rel="stylesheet" href="{% static 'css/dist/app.css' %}">
 </head>
 <body>
@@ -13,6 +31,7 @@
   {% include "components/navbar.html" %}
   <main id="main">{% block content %}{% endblock %}</main>
   {% include "components/footer.html" %}
+  <script src="{% static 'js/theme.js' %}" defer></script>
   <script src="{% static 'js/nav.js' %}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
