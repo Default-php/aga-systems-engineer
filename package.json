@@ -4,7 +4,8 @@
   "description": "Modern Django portfolio showcasing AI integration, cloud infrastructure, DevOps, and systems engineering projects.",
   "main": "index.js",
   "scripts": {
-    "test": "hola"
+    "dev": "tailwindcss -i static/css/src/app.css -o static/css/dist/app.css --watch",
+    "build": "tailwindcss -i static/css/src/app.css -o static/css/dist/app.css --minify"
   },
   "repository": {
     "type": "git",
@@ -18,5 +19,9 @@
   "homepage": "https://github.com/Default-php/aga-systems-engineer#readme",
   "dependencies": {
     "gsap": "^3.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
   }
 }
