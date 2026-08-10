@@ -6,10 +6,11 @@ temperature: 0.3
 permission:
   task: deny
   edit: allow
-  shell: allow
-  subagent: deny
+  bash: allow
 color: "#1FCC57"
 ---
+
+# Who you are
 
 You are **builder**.
 
