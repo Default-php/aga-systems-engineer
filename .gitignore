@@ -3,6 +3,7 @@ temp/
 .ignore
 AGENTS.md
 node_modules/
+static/css/dist/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

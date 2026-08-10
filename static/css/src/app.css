@@ -1,0 +1,86 @@
+/* Portfolio design system — Tailwind CSS v4 (CSS-first configuration).
+   Light/dark themes are driven by the `data-theme` attribute on <html>
+   (set by the theme script before first paint; see templates/base.html). */
+
+@import "tailwindcss";
+
+/* Dark variant keyed on [data-theme="dark"] (approved decision, temp/PLAN.md). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Theme tokens — semantic variables switch per theme; `@theme inline` maps
+   them to utilities: bg-surface, text-ink, text-ink-muted, border-edge,
+   bg-accent, text-on-accent, ...
+--------------------------------------------------------------------------- */
+
+:root {
+  --surface: oklch(0.99 0 0);            /* page background */
+  --surface-2: oklch(0.965 0 0);         /* cards / alternate sections */
+  --ink: oklch(0.21 0.006 285);          /* primary text */
+  --ink-muted: oklch(0.5 0.01 285);      /* secondary text */
+  --edge: oklch(0.905 0 0);              /* borders / dividers */
+  --accent: oklch(0.55 0.19 255);        /* interactive accent */
+  --accent-strong: oklch(0.48 0.19 255); /* hover state */
+  --on-accent: oklch(0.99 0 0);          /* text on accent */
+}
+
+[data-theme="dark"] {
+  --surface: oklch(0.145 0 0);
+  --surface-2: oklch(0.19 0.005 285);
+  --ink: oklch(0.95 0 0);
+  --ink-muted: oklch(0.68 0.01 285);
+  --edge: oklch(0.29 0.005 285);
+  --accent: oklch(0.65 0.17 255);
+  --accent-strong: oklch(0.72 0.15 255);
+  --on-accent: oklch(0.14 0 0);
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-edge: var(--edge);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Base styles
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface font-sans text-ink antialiased;
+  }
+
+  ::selection {
+    @apply bg-accent text-on-accent;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* Respect OS-level reduced-motion preference (PROJECT.md: accessibility). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
