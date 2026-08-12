@@ -46,6 +46,11 @@ SITE_DESCRIPTION = env(
     default="Systems engineer with expertise in AI integration, cloud, automation, Docker, and DevOps.",
 )
 
+# Enable forwarded-proto handling in production (TLS-terminating proxy).
+# Safe to leave off in dev.
+if env.bool("SECURE_PROXY_SSL_HEADER_ENABLED", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 

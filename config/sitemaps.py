@@ -3,7 +3,6 @@ from django.urls import reverse_lazy
 
 from apps.blog.models import Post
 from apps.projects.models import Project
-from apps.certifications.models import Certification
 
 
 class StaticSitemap(Sitemap):
@@ -47,15 +46,3 @@ class ProjectSitemap(Sitemap):
 
     def location(self, obj):
         return obj.get_absolute_url()
-
-
-class CertificationSitemap(Sitemap):
-    priority = 0.5
-    changefreq = "monthly"
-
-    def items(self):
-        return Certification.objects.all()
-
-    def location(self, obj):
-        # Certifications have no detail route; they live on the list page.
-        return reverse_lazy("certifications:list")

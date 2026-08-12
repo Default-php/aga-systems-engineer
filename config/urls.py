@@ -20,12 +20,7 @@ from django.http import HttpResponse
 from django.urls import include, path
 from django.views.decorators.http import require_GET
 
-from config.sitemaps import (
-    BlogSitemap,
-    CertificationSitemap,
-    ProjectSitemap,
-    StaticSitemap,
-)
+from config.sitemaps import BlogSitemap, ProjectSitemap, StaticSitemap
 
 
 @require_GET
@@ -42,7 +37,6 @@ sitemaps = {
     "static": StaticSitemap,
     "blog": BlogSitemap,
     "projects": ProjectSitemap,
-    "certifications": CertificationSitemap,
 }
 
 urlpatterns = [
