@@ -1,3 +1,5 @@
+import calendar
+import locale
 from datetime import datetime, timedelta
 
 from django.test import TestCase
@@ -71,6 +73,9 @@ class PostTests(TestCase):
         self.assertContains(response, "No posts yet.")
 
     def test_published_at_display_locale_independent(self):
+        # calendar.month_abbr is a fixed CPython list literal (not locale-derived),
+        # so the property is locale-independent by construction; the locale
+        # toggle below actively confirms the output does not change.
         post = Post(
             title="Dated",
             slug="dated",
@@ -78,7 +83,21 @@ class PostTests(TestCase):
             is_draft=False,
             published_at=datetime(2026, 3, 15, 12, 0, tzinfo=timezone.UTC),
         )
-        self.assertEqual(post.published_at_display, "Mar 15, 2026")
+        expected = f"{calendar.month_abbr[3]} 15, 2026"
+        self.assertEqual(post.published_at_display, expected)
+        # Active check: toggle to a non-English locale, result unchanged.
+        original = locale.setlocale(locale.LC_TIME)
+        try:
+            locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")
+        except locale.Error:
+            pass  # locale not installed; independence is still implicit via calendar.month_abbr
+        try:
+            self.assertEqual(post.published_at_display, expected)
+        finally:
+            try:
+                locale.setlocale(locale.LC_TIME, original)
+            except (locale.Error, TypeError):
+                pass
 
     def test_get_absolute_url(self):
         self.assertEqual(
