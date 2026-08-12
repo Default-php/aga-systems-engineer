@@ -57,12 +57,29 @@ class CertificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No certifications yet.")
 
-    def test_optional_credential_fields(self):
+    def test_render_shows_credential_id(self):
+        response = self.client.get("/certifications/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ABC-123")
+        self.assertContains(response, "ID:")
+
+    def test_render_shows_credential_url(self):
+        response = self.client.get("/certifications/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "https://example.com/verify")
+        self.assertContains(response, "noopener noreferrer")
+        self.assertContains(response, "Verify")
+
+    def test_render_hides_credential_block_when_blank(self):
+        Certification.objects.all().delete()
+        Certification.objects.create(
+            name="Basics", issuer="Example Institute", date_obtained=date(2021, 1, 1)
+        )
         response = self.client.get("/certifications/")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertNotIn("credential_id", content)
-        self.assertNotIn("credential_url", content)
+        self.assertNotIn("ID:", content)
+        self.assertNotIn("Verify", content)
 
     def test_render_contains_card_content(self):
         response = self.client.get("/certifications/")
