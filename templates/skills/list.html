@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Skills — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Skills</h1>
+      <p class="mt-2 text-ink-muted">A categorized inventory.</p>
+      {% if categories %}
+        {% for category in categories %}
+          {% if category.skills.all %}
+            <section class="mt-10">
+              <h2 class="text-xl font-semibold">{{ category.name }}</h2>
+              <div class="mt-4 flex flex-wrap gap-3">
+                {% for skill in category.skills.all %}
+                  {% include "components/skill_pill.html" with skill=skill %}
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <p class="mt-10 text-ink-muted">No skills yet.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
