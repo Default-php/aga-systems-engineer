@@ -1,3 +1,5 @@
+import calendar
+
 from django.db import models
 
 
@@ -25,6 +27,6 @@ class Experience(models.Model):
 
     @property
     def date_range(self) -> str:
-        start = self.start_date.strftime("%b %Y")
-        end = self.end_date.strftime("%b %Y") if self.end_date else "Present"
+        start = f"{calendar.month_abbr[self.start_date.month]} {self.start_date.year}"
+        end = f"{calendar.month_abbr[self.end_date.month]} {self.end_date.year}" if self.end_date else "Present"
         return f"{start} – {end}"
