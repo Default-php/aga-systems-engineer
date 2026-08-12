@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Blog — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page max-w-3xl">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Blog</h1>
+      <p class="mt-2 text-ink-muted">Notes and writing.</p>
+      {% if posts %}
+        <ul class="mt-10 space-y-8">
+          {% for post in posts %}
+            <li class="border-b border-edge pb-8 last:border-b-0 last:pb-0">
+              <a href="{{ post.get_absolute_url }}" class="group block">
+                <h2 class="text-xl font-semibold text-ink group-hover:text-accent">{{ post.title }}</h2>
+                {% if post.excerpt %}<p class="mt-2 text-ink-muted">{{ post.excerpt }}</p>{% endif %}
+                <time class="mt-2 block text-sm text-ink-muted" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:"long" }}</time>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="mt-10 text-ink-muted">No posts yet.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

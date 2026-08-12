@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} — Blog — {% endblock %}
+
+{% block content %}
+  <article class="section">
+    <div class="container-page max-w-3xl">
+      <a href="{% url "blog:list" %}" class="text-sm text-ink-muted hover:text-ink">← All posts</a>
+      <h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{{ post.title }}</h1>
+      <time class="mt-3 block text-sm text-ink-muted" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:"long" }}</time>
+      {% if post.excerpt %}<p class="mt-4 text-lg text-ink-muted">{{ post.excerpt }}</p>{% endif %}
+      <div class="mt-8 space-y-4 text-ink">{{ post.body|linebreaks }}</div>
+    </div>
+  </article>
+{% endblock %}

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.projects',
     'apps.skills',
     'apps.experience',
+    'apps.blog',
     'apps.certifications',
 ]
 
