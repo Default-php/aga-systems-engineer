@@ -1,4 +1,3 @@
-import calendar
 import locale
 from datetime import datetime, timedelta
 
@@ -7,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.blog.models import Post
+from apps.core.date_utils import MONTH_ABBR_EN
 
 
 class PostTests(TestCase):
@@ -73,9 +73,9 @@ class PostTests(TestCase):
         self.assertContains(response, "No posts yet.")
 
     def test_published_at_display_locale_independent(self):
-        # calendar.month_abbr is a fixed CPython list literal (not locale-derived),
-        # so the property is locale-independent by construction; the locale
-        # toggle below actively confirms the output does not change.
+        # MONTH_ABBR_EN is a hardcoded English list (calendar.month_abbr is
+        # locale-aware in Python 3.12, so it is not used); the locale toggle
+        # below actively confirms the output does not change.
         post = Post(
             title="Dated",
             slug="dated",
@@ -83,14 +83,14 @@ class PostTests(TestCase):
             is_draft=False,
             published_at=datetime(2026, 3, 15, 12, 0, tzinfo=timezone.UTC),
         )
-        expected = f"{calendar.month_abbr[3]} 15, 2026"
+        expected = f"{MONTH_ABBR_EN[3]} 15, 2026"
         self.assertEqual(post.published_at_display, expected)
         # Active check: toggle to a non-English locale, result unchanged.
         original = locale.setlocale(locale.LC_TIME)
         try:
             locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")
         except locale.Error:
-            pass  # locale not installed; independence is still implicit via calendar.month_abbr
+            pass  # locale not installed; independence is still implicit via MONTH_ABBR_EN
         try:
             self.assertEqual(post.published_at_display, expected)
         finally:

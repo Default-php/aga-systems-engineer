@@ -1,8 +1,8 @@
-import calendar
-
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
+
+from apps.core.date_utils import MONTH_ABBR_EN
 
 
 class PublishedManager(models.Manager):
@@ -49,10 +49,12 @@ class Post(models.Model):
 
     @property
     def published_at_display(self) -> str:
+        # MONTH_ABBR_EN is a fixed English list; calendar.month_abbr is
+        # locale-aware in Python 3.12 and must not be used for display.
         if self.published_at is None:
             return ""
         d = self.published_at
-        return f"{calendar.month_abbr[d.month]} {d.day}, {d.year}"
+        return f"{MONTH_ABBR_EN[d.month]} {d.day}, {d.year}"
 
     def get_absolute_url(self) -> str:
         return reverse("blog:detail", kwargs={"slug": self.slug})

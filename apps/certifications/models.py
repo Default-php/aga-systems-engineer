@@ -1,6 +1,6 @@
-import calendar
-
 from django.db import models
+
+from apps.core.date_utils import MONTH_ABBR_EN
 
 
 class Certification(models.Model):
@@ -21,4 +21,6 @@ class Certification(models.Model):
 
     @property
     def date_display(self) -> str:
-        return f"{calendar.month_abbr[self.date_obtained.month]} {self.date_obtained.year}"
+        # MONTH_ABBR_EN is a fixed English list; calendar.month_abbr is
+        # locale-aware in Python 3.12 and must not be used for display.
+        return f"{MONTH_ABBR_EN[self.date_obtained.month]} {self.date_obtained.year}"

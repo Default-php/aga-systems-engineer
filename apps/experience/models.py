@@ -1,6 +1,6 @@
-import calendar
-
 from django.db import models
+
+from apps.core.date_utils import MONTH_ABBR_EN
 
 
 class Experience(models.Model):
@@ -27,6 +27,8 @@ class Experience(models.Model):
 
     @property
     def date_range(self) -> str:
-        start = f"{calendar.month_abbr[self.start_date.month]} {self.start_date.year}"
-        end = f"{calendar.month_abbr[self.end_date.month]} {self.end_date.year}" if self.end_date else "Present"
+        # MONTH_ABBR_EN is a fixed English list; calendar.month_abbr is
+        # locale-aware in Python 3.12 and must not be used for display.
+        start = f"{MONTH_ABBR_EN[self.start_date.month]} {self.start_date.year}"
+        end = f"{MONTH_ABBR_EN[self.end_date.month]} {self.end_date.year}" if self.end_date else "Present"
         return f"{start} – {end}"
