@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -21,7 +23,9 @@ class ContactTests(TestCase):
         self.assertFalse(response.context["form"].is_bound)
 
     @override_settings(
-        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        CONTACT_RECIPIENT_EMAIL="test-recipient@example.com",
+        DEFAULT_FROM_EMAIL="test-from@example.com",
     )
     def test_post_valid_creates_submission_and_redirects(self):
         response = self.client.post("/contact/", VALID_DATA)
@@ -57,7 +61,9 @@ class ContactTests(TestCase):
         self.assertContains(response, "Something went wrong. Please try again.")
 
     @override_settings(
-        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        CONTACT_RECIPIENT_EMAIL="test-recipient@example.com",
+        DEFAULT_FROM_EMAIL="test-from@example.com",
     )
     def test_post_valid_sends_email(self):
         self.client.post("/contact/", VALID_DATA)
@@ -65,9 +71,17 @@ class ContactTests(TestCase):
         message = mail.outbox[0]
         self.assertEqual(message.subject, "Hello")
         self.assertIn("This is a sufficiently long message body.", message.body)
-        self.assertEqual(
-            message.recipients(), ["alfonso.ga@proton.me"]
-        )
+        self.assertEqual(message.to, ["test-recipient@example.com"])
+        self.assertEqual(message.from_email, "test-from@example.com")
+
+    def test_post_email_failure_still_redirects(self):
+        with mock.patch(
+            "apps.contact.views.send_contact_email",
+            side_effect=OSError("smtp down"),
+        ):
+            response = self.client.post("/contact/", VALID_DATA)
+        self.assertRedirects(response, "/contact/?sent=1")
+        self.assertEqual(ContactSubmission.objects.count(), 1)
 
     def test_success_state_shows_thanks(self):
         response = self.client.get("/contact/?sent=1")
