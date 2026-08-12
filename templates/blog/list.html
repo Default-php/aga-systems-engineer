@@ -14,7 +14,7 @@
               <a href="{{ post.get_absolute_url }}" class="group block">
                 <h2 class="text-xl font-semibold text-ink group-hover:text-accent">{{ post.title }}</h2>
                 {% if post.excerpt %}<p class="mt-2 text-ink-muted">{{ post.excerpt }}</p>{% endif %}
-                <time class="mt-2 block text-sm text-ink-muted" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:"long" }}</time>
+                <time class="mt-2 block text-sm text-ink-muted" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at_display }}</time>
               </a>
             </li>
           {% endfor %}

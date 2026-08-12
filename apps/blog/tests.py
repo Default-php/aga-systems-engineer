@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
@@ -69,6 +69,16 @@ class PostTests(TestCase):
         response = self.client.get("/blog/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No posts yet.")
+
+    def test_published_at_display_locale_independent(self):
+        post = Post(
+            title="Dated",
+            slug="dated",
+            body="x",
+            is_draft=False,
+            published_at=datetime(2026, 3, 15, 12, 0, tzinfo=timezone.UTC),
+        )
+        self.assertEqual(post.published_at_display, "Mar 15, 2026")
 
     def test_get_absolute_url(self):
         self.assertEqual(

@@ -1,3 +1,5 @@
+import calendar
+
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
@@ -44,6 +46,13 @@ class Post(models.Model):
     @property
     def is_published(self) -> bool:
         return not self.is_draft and self.published_at is not None
+
+    @property
+    def published_at_display(self) -> str:
+        if self.published_at is None:
+            return ""
+        d = self.published_at
+        return f"{calendar.month_abbr[d.month]} {d.day}, {d.year}"
 
     def get_absolute_url(self) -> str:
         return reverse("blog:detail", kwargs={"slug": self.slug})
