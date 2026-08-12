@@ -40,6 +40,12 @@ if DEBUG:
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", default="alfonso.ga@proton.me")
 
+# Site-wide SEO defaults
+SITE_DESCRIPTION = env(
+    "SITE_DESCRIPTION",
+    default="Systems engineer with expertise in AI integration, cloud, automation, Docker, and DevOps.",
+)
+
 
 # Application definition
 
@@ -50,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sitemaps',
     'apps.core',
     'apps.projects',
     'apps.skills',
@@ -81,6 +88,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.core.context_processors.site_seo',
             ],
         },
     },
