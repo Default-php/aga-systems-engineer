@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Contact — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page max-w-2xl">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Contact</h1>
+      <p class="mt-2 text-ink-muted">Send a message — I'll get back to you.</p>
+
+      {% if sent %}
+        <div class="mt-8 rounded-md border border-edge bg-surface-2 p-6" role="status">
+          <h2 class="text-lg font-semibold text-ink">Thanks — message received.</h2>
+          <p class="mt-2 text-ink-muted">I'll reply to <span class="font-mono">{{ form.cleaned_data.email|default:"" }}</span> as soon as I can.</p>
+          <a href="{% url 'contact:contact' %}" class="mt-4 inline-block text-sm text-accent hover:underline">Send another →</a>
+        </div>
+      {% else %}
+        <form method="post" action="{% url 'contact:contact' %}" class="mt-10 space-y-6" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="rounded-md border border-edge bg-surface-2 p-4 text-sm text-ink" role="alert">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div>
+            <label for="id_name" class="block text-sm font-medium text-ink">Name</label>
+            {{ form.name }}
+            {% if form.name.errors %}<p class="mt-1 text-sm text-accent" role="alert">{{ form.name.errors|join:", " }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label for="id_email" class="block text-sm font-medium text-ink">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}<p class="mt-1 text-sm text-accent" role="alert">{{ form.email.errors|join:", " }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label for="id_subject" class="block text-sm font-medium text-ink">Subject <span class="text-ink-muted">(optional)</span></label>
+            {{ form.subject }}
+            {% if form.subject.errors %}<p class="mt-1 text-sm text-accent" role="alert">{{ form.subject.errors|join:", " }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label for="id_message" class="block text-sm font-medium text-ink">Message</label>
+            {{ form.message }}
+            {% if form.message.errors %}<p class="mt-1 text-sm text-accent" role="alert">{{ form.message.errors|join:", " }}</p>{% endif %}
+          </div>
+
+          {# Honeypot — hidden from real users; bots fill it #}
+          <div aria-hidden="true" style="position: absolute; left: -9999px;">
+            <label for="id_website">Website</label>
+            {{ form.website }}
+          </div>
+
+          <button type="submit" class="btn btn-primary">Send message</button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

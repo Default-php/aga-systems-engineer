@@ -34,6 +34,13 @@ DEBUG = env.bool("DEBUG", default=True)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 
+# Email — console backend in development; real SMTP later (Phase 4).
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", default="alfonso.ga@proton.me")
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -48,6 +55,7 @@ INSTALLED_APPS = [
     'apps.skills',
     'apps.experience',
     'apps.blog',
+    'apps.contact',
     'apps.certifications',
 ]
 
