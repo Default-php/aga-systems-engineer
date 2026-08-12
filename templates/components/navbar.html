@@ -5,7 +5,7 @@
       <a href="/" class="py-2 text-ink-muted transition-colors hover:text-ink">Home</a>
       <a href="{% url 'projects:list' %}" class="py-2 text-ink-muted transition-colors hover:text-ink">Projects</a>
       <a href="{% url 'experience:list' %}" class="py-2 text-ink-muted transition-colors hover:text-ink">Experience</a>
-      <a href="#contact" class="py-2 text-ink-muted transition-colors hover:text-ink">Contact</a>
+      <a href="{% url 'core:home' %}#contact" class="py-2 text-ink-muted transition-colors hover:text-ink">Contact</a>
     </nav>
     <div class="flex items-center gap-2">
       {% include "components/theme_toggle.html" %}
@@ -21,7 +21,7 @@
       <a href="/" class="block px-4 py-2 text-ink-muted hover:bg-surface-2">Home</a>
       <a href="{% url 'projects:list' %}" class="block px-4 py-2 text-ink-muted hover:bg-surface-2">Projects</a>
       <a href="{% url 'experience:list' %}" class="block px-4 py-2 text-ink-muted hover:bg-surface-2">Experience</a>
-      <a href="#contact" class="block px-4 py-2 text-ink-muted hover:bg-surface-2">Contact</a>
+      <a href="{% url 'core:home' %}#contact" class="block px-4 py-2 text-ink-muted hover:bg-surface-2">Contact</a>
     </nav>
   </div>
 </header>
