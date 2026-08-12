@@ -68,23 +68,42 @@ class SeoTests(TestCase):
         self.assertIn('name="twitter:card"', content)
         self.assertIn('rel="canonical"', content)
 
+        expected_home = response.wsgi_request.build_absolute_uri("/")
         canonical = re.search(
             r'<link\s+rel="canonical"\s+href="([^"]+)"', content
         )
         self.assertIsNotNone(canonical)
-        self.assertEqual(canonical.group(1), "http://testserver/")
+        self.assertEqual(canonical.group(1), expected_home)
 
         og_url = re.search(
             r'<meta\s+property="og:url"\s+content="([^"]+)"', content
         )
         self.assertIsNotNone(og_url)
-        self.assertEqual(og_url.group(1), "http://testserver/")
+        self.assertEqual(og_url.group(1), expected_home)
 
         og_desc = re.search(
             r'<meta\s+property="og:description"\s+content="([^"]+)"', content
         )
         self.assertIsNotNone(og_desc)
         self.assertTrue(og_desc.group(1).strip())
+
+    def test_non_home_page_has_per_page_canonical(self):
+        response = self.client.get("/projects/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        expected = response.wsgi_request.build_absolute_uri("/projects/")
+
+        canonical = re.search(
+            r'<link\s+rel="canonical"\s+href="([^"]+)"', content
+        )
+        self.assertIsNotNone(canonical)
+        self.assertEqual(canonical.group(1), expected)
+
+        og_url = re.search(
+            r'<meta\s+property="og:url"\s+content="([^"]+)"', content
+        )
+        self.assertIsNotNone(og_url)
+        self.assertEqual(og_url.group(1), expected)
 
     def test_meta_description_default_matches_settings(self):
         response = self.client.get("/")
