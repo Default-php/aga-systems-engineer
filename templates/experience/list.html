@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Experience — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page max-w-3xl">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Experience</h1>
+      <p class="mt-2 text-ink-muted">Professional timeline.</p>
+      {% if entries %}
+        <div class="mt-10">
+          {% for entry in entries %}
+            {% include "components/timeline_entry.html" with entry=entry %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="mt-10 text-ink-muted">No experience yet.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

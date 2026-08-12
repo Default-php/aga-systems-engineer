@@ -1,0 +1,6 @@
+<article class="grid gap-2 border-l-2 border-edge pl-6 pb-8 last:pb-0">
+  <div class="text-sm text-ink-muted">{{ entry.date_range }}{% if entry.is_current %} <span class="ml-2 inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Current</span>{% endif %}</div>
+  <h3 class="text-lg font-semibold text-ink">{{ entry.title }}<span class="text-ink-muted font-normal"> · {{ entry.organization }}</span></h3>
+  {% if entry.location %}<div class="text-sm text-ink-muted">{{ entry.location }}</div>{% endif %}
+  {% if entry.description %}<p class="text-ink-muted">{{ entry.description|linebreaks }}</p>{% endif %}
+</article>
