@@ -50,6 +50,14 @@ class SkillTests(TestCase):
             [s.display_order for s in data_cat.skills.all()], [1, 2, 3]
         )
 
+    def test_category_without_skills_shows_empty_state(self):
+        Category.objects.create(name="Empty", slug="empty", display_order=1)
+        Skill.objects.all().delete()  # fixture category has a skill; remove it
+        response = self.client.get("/skills/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Category.objects.exists())
+        self.assertContains(response, "No skills yet.")
+
     def test_empty_list(self):
         Category.objects.all().delete()
         response = self.client.get("/skills/")
