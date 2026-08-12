@@ -68,3 +68,45 @@ class ExperienceTests(TestCase):
     def test_str_includes_role_and_org(self):
         self.assertIn(self.current.title, str(self.current))
         self.assertIn(self.current.organization, str(self.current))
+
+
+class ExperienceRenderTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.current = Experience.objects.create(
+            title="Senior Engineer",
+            organization="ACME Corp",
+            start_date=date(2024, 1, 1),
+            end_date=None,
+            description="Leading platform work.",
+        )
+        cls.past = Experience.objects.create(
+            title="Engineer",
+            organization="Globex",
+            start_date=date(2020, 1, 1),
+            end_date=date(2022, 6, 1),
+            description="Built APIs.",
+        )
+        cls.multi = Experience.objects.create(
+            title="Analyst",
+            organization="Initech",
+            start_date=date(2018, 3, 1),
+            end_date=date(2019, 5, 1),
+            description="First paragraph.\n\nSecond paragraph.",
+        )
+
+    def test_render_contains_date_range_and_title(self):
+        response = self.client.get("/experience/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Jan 2020 – Jun 2022")
+        self.assertContains(response, "Engineer")
+        self.assertContains(response, "Globex")
+
+    def test_render_shows_current_badge(self):
+        response = self.client.get("/experience/")
+        self.assertContains(response, "Current")
+
+    def test_render_linebreaks_description(self):
+        response = self.client.get("/experience/")
+        self.assertContains(response, "<p>First paragraph.</p>")
+        self.assertContains(response, "<p>Second paragraph.</p>")
