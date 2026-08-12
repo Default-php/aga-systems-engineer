@@ -1,27 +1,13 @@
 from django.shortcuts import render
 
-# Phase 2: replace placeholder data with apps.projects queryset.
-projects = [
-    {
-        "title": "AI Assistant Integration",
-        "description": "End-to-end integration of AI capabilities into a Django application.",
-        "tags": ["Python", "REST APIs", "AI"],
-        "url": "#",
-    },
-    {
-        "title": "Cloud Deployment Pipeline",
-        "description": "Automated build-and-deploy pipeline for containerized services.",
-        "tags": ["Docker", "CI/CD", "Cloud"],
-        "url": "#",
-    },
-    {
-        "title": "Infrastructure Automation",
-        "description": "Repeatable provisioning and configuration for server fleets.",
-        "tags": ["Linux", "Ansible", "Automation"],
-        "url": "#",
-    },
-]
+from apps.projects.models import Project
 
 
 def home(request):
+    featured = list(
+        Project.objects.filter(featured=True).order_by("display_order", "-created_at")[:3]
+    )
+    projects = featured or list(
+        Project.objects.all().order_by("display_order", "-created_at")[:3]
+    )
     return render(request, "home.html", {"projects": projects})

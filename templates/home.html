@@ -61,9 +61,15 @@
     <div class="container-page">
       <h2 class="mb-6 text-2xl font-semibold">Featured projects</h2>
       <div class="grid gap-6 md:grid-cols-3">
-        {# Phase 2 replaces this view-provided placeholder data with apps.projects DB content #}
+        {# Home projects are served from apps.projects (admin-managed). #}
         {% for project in projects %}
-          {% include "components/project_card.html" with title=project.title description=project.description tags=project.tags url=project.url %}
+          {% if project.tags_list %}
+            {% include "components/project_card.html" with title=project.title description=project.summary tags=project.tags_list url=project.get_absolute_url %}
+          {% else %}
+            {% include "components/project_card.html" with title=project.title description=project.description tags=project.tags url="#" %}
+          {% endif %}
+        {% empty %}
+          <p class="md:col-span-3 text-ink-muted">Add projects via the admin to populate this section.</p>
         {% endfor %}
       </div>
     </div>
