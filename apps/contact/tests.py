@@ -74,16 +74,33 @@ class ContactTests(TestCase):
         self.assertEqual(message.to, ["test-recipient@example.com"])
         self.assertEqual(message.from_email, "test-from@example.com")
 
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        CONTACT_RECIPIENT_EMAIL="test-recipient@example.com",
+        DEFAULT_FROM_EMAIL="test-from@example.com",
+    )
     @patch("apps.contact.views.send_contact_email")
     def test_post_email_failure_still_redirects(self, mock_send):
         mock_send.side_effect = OSError("smtp unreachable")
-        response = self.client.post("/contact/", VALID_DATA)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("sent=1", response.url)
+        response = self.client.post(
+            reverse("contact:contact"),
+            {
+                "name": "Alice",
+                "email": "alice@example.com",
+                "subject": "Hi",
+                "message": "This is a test message of sufficient length.",
+                "website": "",  # honeypot blank
+            },
+        )
+        expected_url = reverse("contact:contact") + "?sent=1"
+        self.assertRedirects(
+            response, expected_url, fetch_redirect_response=False
+        )
         self.assertEqual(mock_send.call_count, 1)
-        submission = ContactSubmission.objects.get()
-        self.assertEqual(mock_send.call_args[0][0].pk, submission.pk)
-        self.assertEqual(ContactSubmission.objects.count(), 1)
+        sent_kw = mock_send.call_args[0][0]
+        self.assertEqual(
+            ContactSubmission.objects.filter(pk=sent_kw.pk).count(), 1
+        )
 
     def test_success_state_shows_thanks(self):
         response = self.client.get("/contact/?sent=1")
