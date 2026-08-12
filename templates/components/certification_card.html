@@ -1,0 +1,13 @@
+<article class="card flex flex-col gap-2">
+  <div class="flex items-start justify-between gap-3">
+    <h3 class="text-base font-semibold text-ink">{{ cert.name }}</h3>
+    <time class="text-sm text-ink-muted whitespace-nowrap" datetime="{{ cert.date_obtained|date:'c' }}">{{ cert.date_display }}</time>
+  </div>
+  <div class="text-sm text-ink-muted">{{ cert.issuer }}</div>
+  {% if cert.credential_id or cert.credential_url %}
+    <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+      {% if cert.credential_id %}<span class="text-ink-muted">ID: <span class="font-mono">{{ cert.credential_id }}</span></span>{% endif %}
+      {% if cert.credential_url %}<a class="text-accent hover:underline" href="{{ cert.credential_url }}" rel="noopener noreferrer">Verify →</a>{% endif %}
+    </div>
+  {% endif %}
+</article>
