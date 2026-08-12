@@ -1,4 +1,4 @@
-from unittest import mock
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase, override_settings
@@ -74,13 +74,15 @@ class ContactTests(TestCase):
         self.assertEqual(message.to, ["test-recipient@example.com"])
         self.assertEqual(message.from_email, "test-from@example.com")
 
-    def test_post_email_failure_still_redirects(self):
-        with mock.patch(
-            "apps.contact.views.send_contact_email",
-            side_effect=OSError("smtp down"),
-        ):
-            response = self.client.post("/contact/", VALID_DATA)
-        self.assertRedirects(response, "/contact/?sent=1")
+    @patch("apps.contact.views.send_contact_email")
+    def test_post_email_failure_still_redirects(self, mock_send):
+        mock_send.side_effect = OSError("smtp unreachable")
+        response = self.client.post("/contact/", VALID_DATA)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("sent=1", response.url)
+        self.assertEqual(mock_send.call_count, 1)
+        submission = ContactSubmission.objects.get()
+        self.assertEqual(mock_send.call_args[0][0].pk, submission.pk)
         self.assertEqual(ContactSubmission.objects.count(), 1)
 
     def test_success_state_shows_thanks(self):
