@@ -44,15 +44,28 @@ class HomeViewTests(TestCase):
     def test_home_projects_featured_first(self):
         Project.objects.all().delete()
         Project.objects.create(
+            title="Feat A", slug="feat-a", summary="sa", featured=True, display_order=10
+        )
+        Project.objects.create(
+            title="Feat B", slug="feat-b", summary="sb", featured=True, display_order=0
+        )
+        Project.objects.create(
+            title="Feat C", slug="feat-c", summary="sc", featured=True, display_order=5
+        )
+        Project.objects.create(
             title="One", slug="one", summary="s1", featured=False, display_order=1
         )
         Project.objects.create(
             title="Two", slug="two", summary="s2", featured=False, display_order=2
         )
-        Project.objects.create(
-            title="Featured", slug="featured", summary="s3", featured=True, display_order=3
-        )
         response = self.client.get(reverse("core:home"))
         projects = response.context["projects"]
-        self.assertEqual(len(projects), 1)
-        self.assertEqual(projects[0].title, "Featured")
+        self.assertEqual(len(projects), 3)
+        self.assertTrue(all(p.featured for p in projects))
+        self.assertEqual([p.display_order for p in projects], [0, 5, 10])
+
+    def test_home_empty_projects_renders_admin_fallback(self):
+        Project.objects.all().delete()
+        response = self.client.get(reverse("core:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add projects via the admin")
