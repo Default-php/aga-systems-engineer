@@ -22,5 +22,6 @@ urlpatterns = [
     path("projects/", include("apps.projects.urls")),
     path("skills/", include("apps.skills.urls")),
     path("experience/", include("apps.experience.urls")),
+    path("certifications/", include("apps.certifications.urls")),
     path('admin/', admin.site.urls),
 ]

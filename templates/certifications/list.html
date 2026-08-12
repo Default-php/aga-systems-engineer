@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Certifications — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page max-w-3xl">
+      <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Certifications</h1>
+      <p class="mt-2 text-ink-muted">Professional credentials.</p>
+      {% if certs %}
+        <div class="mt-10 grid gap-4">
+          {% for cert in certs %}
+            {% include "components/certification_card.html" with cert=cert %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="mt-10 text-ink-muted">No certifications yet.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
