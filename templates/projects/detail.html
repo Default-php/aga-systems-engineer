@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.title }} — Projects — {% endblock %}
+
+{% block content %}
+  <section class="section">
+    <div class="container-page max-w-3xl">
+      <a href="{% url "projects:list" %}" class="text-sm text-ink-muted hover:text-ink">← All projects</a>
+      <h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{{ project.title }}</h1>
+      <p class="mt-3 text-lg text-ink-muted">{{ project.summary }}</p>
+      {% if project.tags_list %}
+        <div class="mt-6 flex flex-wrap gap-2">
+          {% for tag in project.tags_list %}
+            <span class="badge">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <div class="prose-body mt-8 text-ink">{{ project.description|linebreaks }}</div>
+      {% if project.repo_url or project.demo_url %}
+        <div class="mt-8 flex gap-3">
+          {% if project.repo_url %}
+            <a class="btn btn-ghost" href="{{ project.repo_url }}" rel="noopener noreferrer">View source</a>
+          {% endif %}
+          {% if project.demo_url %}
+            <a class="btn btn-primary" href="{{ project.demo_url }}" rel="noopener noreferrer">Live demo</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
