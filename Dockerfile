@@ -11,6 +11,9 @@ COPY static/css/src ./static/css/src
 # Tailwind v4 is CSS-first and auto-scans sources for utility classes —
 # templates must be present so the generated CSS includes the site's classes.
 COPY templates/ ./templates/
+# Tailwind v4 CLI does not always create the output parent directory, so make
+# sure static/css/dist exists before the build writes app.css into it.
+RUN mkdir -p static/css/dist
 # Tailwind v4 is CSS-first — no JS config file to copy.
 RUN npm run build   # writes static/css/dist/app.css
 
