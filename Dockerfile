@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
-ARG PYTHON_VERSION=3.12
+
+# Node version for the CSS build stage. Python stages use a literal
+# digest-pinned reference (python:3.12-slim@sha256:...), so no ARG for them.
 ARG NODE_VERSION=22
 
 # Stage 1: build CSS
@@ -18,7 +20,7 @@ RUN mkdir -p static/css/dist
 RUN npm run build   # writes static/css/dist/app.css
 
 # Stage 2: install python deps + collect static
-FROM python:${PYTHON_VERSION}-slim AS python-builder
+FROM python:3.12-slim@sha256:ffd5d35f5cf6dfba89eaaebd93d5ad142faa7a7f2c728742c5b50cb81baff526 AS python-builder
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 RUN apt-get update \
@@ -36,15 +38,24 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.production \
     python manage.py collectstatic --noinput
 
 # Stage 3: runtime
-FROM python:${PYTHON_VERSION}-slim AS runtime
+FROM python:3.12-slim@sha256:ffd5d35f5cf6dfba89eaaebd93d5ad142faa7a7f2c728742c5b50cb81baff526 AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=config.settings.production
 WORKDIR /app
+
+# System dependencies — separate RUN so an apt failure does not waste the user
+# creation layer and the layer state is debuggable. libpq5/curl are left
+# unpinned deliberately: apt version pins are brittle across Debian releases
+# and provide little payoff for runtime libraries.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --shell /bin/bash --uid 1000 app
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash --uid 1000 app
+
 COPY --from=python-builder /app /app
 RUN chown -R app:app /app
 # entrypoint copied + chmod'ed as root BEFORE switching to the non-root user
