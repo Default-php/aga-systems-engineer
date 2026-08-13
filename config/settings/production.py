@@ -1,23 +1,30 @@
 """Production settings — env-driven, security-hardened, Postgres, WhiteNoise."""
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F401,F403
 
 SECRET_KEY = env("SECRET_KEY")  # required, no default
 DEBUG = False
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["example.com"])
 
-DATABASES = {
-    "default": env.db("DATABASE_URL", default="postgres://postgres:postgres@db:5432/portfolio"),
-}
+db_url = env("DATABASE_URL", default=None)
+if not db_url:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is required in production. Set it in the environment."
+    )
+# env.db_url_config parses a URL string directly; env.db() expects a var name.
+DATABASES = {"default": env.db_url_config(db_url)}
 
 # Static files via WhiteNoise (already in base.txt requirements).
-# Django 6 uses STORAGES; STATICFILES_STORAGE is kept as a legacy alias.
+# Include the default storage alias so default_storage (ImageField/FileField)
+# keeps working. STATICFILES_STORAGE is intentionally unset — removed in Django 6.
 STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Append WhiteNoise middleware after SecurityMiddleware.
 _MIDDLEWARE_BASE = list(MIDDLEWARE)
