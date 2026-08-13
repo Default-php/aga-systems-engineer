@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Alfonso González Arellano — Systems Engineer{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{{ SITE_DESCRIPTION }}{% endblock %}">
   <link rel="canonical" href="{% block canonical %}{{ request.build_absolute_uri }}{% endblock %}">
@@ -41,10 +42,12 @@
   {% include "components/navbar.html" %}
   <main id="main">{% block content %}{% endblock %}</main>
   {% include "components/footer.html" %}
+  {% include "ai_assistant/widget.html" %}
   <script src="{% static 'js/theme.js' %}" defer></script>
   <script src="{% static 'js/nav.js' %}" defer></script>
   <script src="{% static 'js/vendor/gsap.min.js' %}" defer></script>
   <script src="{% static 'js/animations.js' %}" defer></script>
+  <script src="{% static 'js/chat_widget.js' %}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

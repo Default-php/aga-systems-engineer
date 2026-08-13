@@ -26,6 +26,11 @@ _SITE_DESCRIPTION = (
 
 SITE_DESCRIPTION = env("SITE_DESCRIPTION", default=_SITE_DESCRIPTION)
 
+# OpenRouter — RAG chat assistant (task 4.5). Empty key enables demo mode.
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_MODEL = env("OPENROUTER_MODEL", default="openrouter/auto:free")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
 
 # Application definition
 
@@ -43,6 +48,7 @@ INSTALLED_APPS = [
     "apps.experience",
     "apps.blog",
     "apps.contact",
+    "apps.ai_assistant",
     "apps.certifications",
 ]
 

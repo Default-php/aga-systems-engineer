@@ -49,5 +49,6 @@ urlpatterns = [
     path("experience/", include("apps.experience.urls")),
     path("blog/", include("apps.blog.urls")),
     path("contact/", include("apps.contact.urls")),
+    path("", include("apps.ai_assistant.urls")),
     path("certifications/", include("apps.certifications.urls")),
 ]
