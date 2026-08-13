@@ -6,6 +6,7 @@ the API implicitly.
 """
 
 import logging
+import textwrap
 
 import requests
 from django.conf import settings
@@ -16,6 +17,26 @@ logger = logging.getLogger(__name__)
 
 CONTEXT_CACHE_KEY = "ai_assistant:context"
 CONTEXT_CACHE_TTL = 300  # 5 minutes
+
+# Per-field truncation limits applied when building the context string so
+# unbounded TextFields cannot blow up the prompt.
+FIELD_LIMITS = {"description": 500, "body": 500, "excerpt": 200}
+
+
+class OpenRouterError(Exception):
+    """Raised when the OpenRouter API returns a non-2xx response."""
+
+
+def _shorten(value, field: str) -> str:
+    limit = FIELD_LIMITS.get(field, 500)
+    value = (value or "").strip()
+    if len(value) <= limit:
+        return value
+    return textwrap.shorten(value, width=limit, placeholder="…")
+
+
+def _invalidate_context_cache(sender, **kwargs):
+    cache.delete(CONTEXT_CACHE_KEY)
 
 
 def build_context() -> str:
@@ -49,7 +70,8 @@ def build_context() -> str:
         lines.append("EXPERIENCE:")
         for e in experience:
             lines.append(
-                f"- {e.title} at {e.organization} ({e.date_range}): {e.description}"
+                f"- {e.title} at {e.organization} ({e.date_range}): "
+                f"{_shorten(e.description, 'description')}"
             )
 
     certs = list(Certification.objects.all())
@@ -67,7 +89,7 @@ def build_context() -> str:
         for post in posts:
             lines.append(
                 f"- {post.title} ({post.get_absolute_url()}): "
-                f"{post.excerpt or ''} {post.body[:500]}"
+                f"{_shorten(post.excerpt, 'excerpt')} {_shorten(post.body, 'body')}"
             )
 
     return "\n".join(lines)
@@ -115,15 +137,17 @@ def demo_mode_answer() -> str:
     )
 
 
-def call_openrouter(messages, *, stream=False):
-    """POST to the OpenRouter chat completions endpoint.
+def call_openrouter(messages, *, stream=False) -> str:
+    """POST to the OpenRouter chat completions endpoint and return the answer text.
 
-    Raises RuntimeError on non-2xx with a meaningful message. Callers must
-    either provide a key or use demo mode (see views).
+    Raises :class:`OpenRouterError` on any non-2xx response. Callers must either
+    provide a key or use demo mode (see views).
     """
     api_key = getattr(settings, "OPENROUTER_API_KEY", "")
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set; refusing to call the API.")
+        raise OpenRouterError(
+            "OPENROUTER_API_KEY is not set; refusing to call the API."
+        )
 
     response = requests.post(
         f"{settings.OPENROUTER_BASE_URL}/chat/completions",
@@ -138,8 +162,9 @@ def call_openrouter(messages, *, stream=False):
         },
         timeout=30,
     )
-    if response.status_code >= 400:
-        raise RuntimeError(
-            f"OpenRouter request failed: {response.status_code} {response.text[:200]}"
+    if not response.ok:  # covers all 4xx and 5xx
+        raise OpenRouterError(
+            f"openrouter {response.status_code}: {response.text[:300]}"
         )
-    return response.json()
+    data = response.json()
+    return data["choices"][0]["message"]["content"]

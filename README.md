@@ -13,6 +13,7 @@ deployment, and an AI-assistant integration.
 - SQLite in development; PostgreSQL in production (via `DATABASE_URL`)
 - Docker / Docker Compose (multi-stage build, Postgres, healthchecks)
 - GitHub Actions CI
+- OpenRouter AI integration (RAG chat assistant, Phase 4.5)
 
 ## Local setup
 
@@ -43,6 +44,8 @@ gitignored — never commit it.
 | `SITE_DESCRIPTION` | Default meta/OG description |
 | `SECURE_PROXY_SSL_HEADER_ENABLED` | `True` when behind a TLS-terminating proxy |
 | `POSTGRES_PASSWORD` | Required for `docker compose up` (no default) |
+| `OPENROUTER_API_KEY` | Optional — forwarded to the AI widget; empty enables demo mode |
+| `OPENROUTER_MODEL` | OpenRouter model to use (default `openrouter/auto:free`) |
 
 `DATABASE_URL` is only read by the `production` settings module; local development
 uses SQLite automatically.
@@ -64,7 +67,7 @@ To run the full stack:
 
 ```bash
 cp .env.example .env
-# set POSTGRES_PASSWORD, SECRET_KEY, ALLOWED_HOSTS
+# set POSTGRES_PASSWORD, SECRET_KEY, ALLOWED_HOSTS, OPENROUTER_API_KEY
 docker compose up --build
 ```
 
@@ -89,11 +92,12 @@ Production requires these environment variables:
 - `DATABASE_URL` — e.g. `postgres://user:pass@host:5432/portfolio`
 - `SECRET_KEY`
 - `ALLOWED_HOSTS`
+- `OPENROUTER_API_KEY` (for the AI widget; demo mode runs without)
 
 ## Project layout
 
 - `config/` — Django project: settings split into `base` / `development` / `production`, URLconf, WSGI/ASGI
-- `apps/` — Django apps: `core`, `projects`, `skills`, `experience`, `certifications`, `blog`, `contact`
+- `apps/` — Django apps: `core`, `projects`, `skills`, `experience`, `certifications`, `blog`, `contact`, `ai_assistant`
 - `templates/`, `static/`, `media/` — frontend assets
 - `requirements/` — `base.txt` (dev + shared), `production.txt` (runtime extras)
 - `.github/workflows/ci.yml` — GitHub Actions: checks, tests, JS tests, informational lint

@@ -11,6 +11,7 @@ from apps.projects.models import Project
 from apps.skills.models import Category, Skill
 
 
+@override_settings(OPENROUTER_API_KEY="")
 class ChatApiTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -60,9 +61,7 @@ class ChatApiTests(TestCase):
 
     @patch("apps.ai_assistant.views.call_openrouter")
     def test_chat_api_calls_openrouter_with_context(self, mock_call):
-        mock_call.return_value = {
-            "choices": [{"message": {"content": "Mocked answer."}}]
-        }
+        mock_call.return_value = "Mocked answer."
         with override_settings(OPENROUTER_API_KEY="test-key"):
             response = self.client.post(
                 "/chat/",
@@ -82,9 +81,7 @@ class ChatApiTests(TestCase):
 
     @patch("apps.ai_assistant.views.call_openrouter")
     def test_chat_persists_chatmessage(self, mock_call):
-        mock_call.return_value = {
-            "choices": [{"message": {"content": "Saved answer."}}]
-        }
+        mock_call.return_value = "Saved answer."
         with override_settings(OPENROUTER_API_KEY="test-key"):
             self.client.post(
                 "/chat/",

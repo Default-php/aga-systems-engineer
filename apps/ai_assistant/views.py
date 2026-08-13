@@ -19,10 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 def _client_ip(request) -> str:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
+    # Behind a trusted TLS-terminating proxy (SECURE_PROXY_SSL_HEADER_ENABLED)
+    # take the leftmost XFF value; otherwise trust the connection peer, which
+    # is not spoofable by the client.
+    if getattr(settings, "SECURE_PROXY_SSL_HEADER_ENABLED", False):
+        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        return xff.split(",")[0].strip() or request.META.get("REMOTE_ADDR", "")
+    return request.META.get("REMOTE_ADDR", "")
 
 
 def _rate_limited(ip: str) -> bool:
@@ -73,8 +76,7 @@ def chat_api(request):
         answer = services.demo_mode_answer()
     else:
         try:
-            data = call_openrouter(messages, stream=False)
-            answer = data["choices"][0]["message"]["content"]
+            answer = call_openrouter(messages, stream=False)
         except Exception:
             logger.exception("OpenRouter call failed")
             answer = (
