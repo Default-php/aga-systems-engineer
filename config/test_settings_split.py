@@ -83,7 +83,8 @@ class TestSettingsSplit(unittest.TestCase):
             "db = settings.DATABASES['default']; "
             "print(settings.DEBUG, db['ENGINE'], sorted(settings.STORAGES), "
             "default_storage._wrapped.__class__.__name__); "
-            "print('DB:', db['NAME'], db['USER'], db['PASSWORD'], db['HOST'], db['PORT'])",
+            "print('DB:', db['NAME'], db['USER'], db['PASSWORD'], "
+            "db['HOST'], db['PORT'])",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(
