@@ -8,6 +8,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY static/css/src ./static/css/src
+# Tailwind v4 is CSS-first and auto-scans sources for utility classes —
+# templates must be present so the generated CSS includes the site's classes.
+COPY templates/ ./templates/
 # Tailwind v4 is CSS-first — no JS config file to copy.
 RUN npm run build   # writes static/css/dist/app.css
 

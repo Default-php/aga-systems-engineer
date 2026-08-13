@@ -4,8 +4,9 @@
 .DS_Store
 node_modules
 .venv
-temp
 temp/
 db.sqlite3
 static/css/dist
 *.md
+.env
+.env.*
