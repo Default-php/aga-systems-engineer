@@ -1,0 +1,7 @@
+ignored:
+  # DL3008: Pin versions in apt-get install. Brittle across Debian releases;
+  # runtime libs (libpq5, curl) are stable and pinning provides little payoff.
+  - DL3008
+  # DL3059: Multiple consecutive RUN instructions. The split-RUN pattern in
+  # the runtime stage is intentional — it isolates failures per layer.
+  - DL3059
