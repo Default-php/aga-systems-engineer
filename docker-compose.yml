@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portfolio}
+      POSTGRES_USER: ${POSTGRES_USER:-portfolio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portfolio}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD:-portfolio}@db:5432/${POSTGRES_DB:-portfolio}
+      DJANGO_SETTINGS_MODULE: config.settings.production
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  staticfiles:
+  media:
