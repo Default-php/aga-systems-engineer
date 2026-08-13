@@ -7,10 +7,7 @@ on:
   push:
     branches:
       - main
-      - phase1/base-ui
-      - phase2/content-apps
-      - phase3/blog-contact-seo
-      - phase4/devops-showcase
+      - "phase*/*"
   pull_request:
     branches:
       - main
