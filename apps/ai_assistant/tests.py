@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
@@ -7,6 +8,7 @@ from django.utils import timezone
 from apps.ai_assistant import services
 from apps.ai_assistant.models import ChatMessage
 from apps.blog.models import Post
+from apps.experience.models import Experience
 from apps.projects.models import Project
 from apps.skills.models import Category, Skill
 
@@ -112,6 +114,7 @@ class ChatApiTests(TestCase):
     @patch("apps.ai_assistant.services.requests.post")
     def test_openrouter_call_format(self, mock_post):
         mock_resp = MagicMock()
+        mock_resp.ok = True
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
         mock_post.return_value = mock_resp
@@ -132,3 +135,81 @@ class ChatApiTests(TestCase):
         self.assertEqual(
             [m["role"] for m in kwargs["json"]["messages"]], ["system", "user"]
         )
+
+    @patch("apps.ai_assistant.services.build_context", wraps=services.build_context)
+    def test_cache_invalidation_on_model_save(self, mock_build):
+        services.get_context()  # warms cache — build_context call #1
+        self.assertIsNotNone(cache.get(services.CONTEXT_CACHE_KEY))
+        project = Project.objects.first()
+        project.save()  # post_save signal invalidates the cache
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+        services.get_context()  # rebuilds — build_context call #2
+        self.assertEqual(mock_build.call_count, 2)
+
+    @patch("apps.ai_assistant.services.build_context", wraps=services.build_context)
+    def test_cache_invalidation_on_model_delete(self, mock_build):
+        services.get_context()  # warms cache — build_context call #1
+        project = Project.objects.first()
+        project.delete()  # post_delete signal invalidates the cache
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+        services.get_context()  # rebuilds — build_context call #2
+        self.assertEqual(mock_build.call_count, 2)
+
+    def test_context_truncation_bounds(self):
+        long_desc = "D" * 2000
+        Experience.objects.create(
+            title="Truncated Role",
+            organization="Some Co",
+            start_date=date(2020, 1, 1),
+            description=long_desc,
+        )
+        context = services.build_context()
+        self.assertIn("…", context)
+        self.assertNotIn(long_desc, context)
+        # A 2000-char description is bounded to ~500 + ellipsis, so the whole
+        # context stays small even with the other fixtures present.
+        self.assertLess(len(context), 1000)
+
+    def test_rate_limit_uses_remote_addr_not_xff(self):
+        cache.clear()
+        last = None
+        # Different XFF values each time — if XFF were honored, each would be a
+        # fresh bucket and the limit would never fire; it still fires after 10
+        # because REMOTE_ADDR (127.0.0.1) drives the counter.
+        for i in range(11):
+            last = self.client.post(
+                "/chat/",
+                data={"message": "Q"},
+                content_type="application/json",
+                HTTP_X_FORWARDED_FOR=f"1.2.3.{i}",
+            )
+        self.assertEqual(last.status_code, 429)
+
+    @patch("apps.ai_assistant.services.requests.post")
+    def test_call_openrouter_raises_on_non_2xx(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_resp.status_code = 429
+        mock_resp.text = "rate limited"
+        mock_post.return_value = mock_resp
+        with override_settings(OPENROUTER_API_KEY="test-key"):
+            with self.assertRaises(services.OpenRouterError) as ctx:
+                services.call_openrouter(
+                    [{"role": "user", "content": "hi"}], stream=False
+                )
+        self.assertIn("429", str(ctx.exception))
+
+    @patch("apps.ai_assistant.services.requests.post")
+    def test_call_openrouter_returns_message_content(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "Hello from the model."}}]
+        }
+        mock_post.return_value = mock_resp
+        with override_settings(OPENROUTER_API_KEY="test-key"):
+            result = services.call_openrouter(
+                [{"role": "user", "content": "hi"}], stream=False
+            )
+        self.assertEqual(result, "Hello from the model.")
