@@ -80,8 +80,10 @@ class TestSettingsSplit(unittest.TestCase):
             "from django.conf import settings; "
             "from django.core.files.storage import default_storage; "
             "default_storage.base_location; "
-            "print(settings.DEBUG, settings.DATABASES['default']['ENGINE'], "
-            "sorted(settings.STORAGES), default_storage._wrapped.__class__.__name__)",
+            "db = settings.DATABASES['default']; "
+            "print(settings.DEBUG, db['ENGINE'], sorted(settings.STORAGES), "
+            "default_storage._wrapped.__class__.__name__); "
+            "print('DB:', db['NAME'], db['USER'], db['PASSWORD'], db['HOST'], db['PORT'])",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(
@@ -89,6 +91,10 @@ class TestSettingsSplit(unittest.TestCase):
             "['default', 'staticfiles'] FileSystemStorage",
             result.stdout,
         )
+        # Parsed DATABASE fields for postgres://u:p@h:5432/db
+        # (ENGINE/NAME/USER/PASSWORD/HOST/PORT all derived from the URL,
+        # not a hardcoded dict — catches parser regressions or leaked creds.)
+        self.assertIn("DB: db u p h 5432", result.stdout)
 
     def test_production_fails_closed_without_database_url(self):
         result = self._run(
