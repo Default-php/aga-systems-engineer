@@ -156,31 +156,50 @@ class ChatApiTests(TestCase):
         self.assertEqual(mock_build.call_count, 2)
 
     def test_context_truncation_bounds(self):
-        long_desc = "D" * 2000
-        Experience.objects.create(
+        long_desc = "word " * 400  # ~2000 chars, whitespace-separated
+        fixture_exp = Experience.objects.create(
             title="Truncated Role",
             organization="Some Co",
             start_date=date(2020, 1, 1),
             description=long_desc,
         )
-        context = services.build_context()
-        self.assertIn("…", context)
-        self.assertNotIn(long_desc, context)
-        # A 2000-char description is bounded to ~500 + ellipsis, so the whole
-        # context stays small even with the other fixtures present.
-        self.assertLess(len(context), 1000)
+        ctx = services.build_context()
+        # Locate the fixture's experience line in the context.
+        marker = f"- {fixture_exp.title} at {fixture_exp.organization}"
+        i = ctx.find(marker)
+        self.assertNotEqual(i, -1, "context missing the fixture experience")
+        seg = ctx[i:]
+        desc_start = seg.find(": ")
+        desc_text = (
+            seg[desc_start + 2 :].split("\n")[0]  # noqa: E203 (black slice style)
+            if desc_start != -1
+            else ""
+        )
+        # Pinned to the FIELD_LIMITS bound (+ ellipsis + small slack), so a
+        # degenerate "…"-only truncation would NOT pass.
+        self.assertLessEqual(
+            len(desc_text),
+            services.FIELD_LIMITS["description"] + len("…") + 1,
+            f"description not truncated to <= 500 chars: {len(desc_text)}",
+        )
+        # Truncation actually happened — the ellipsis is present.
+        self.assertIn("…", desc_text)
+        # The full 2000-char fixture string must not appear verbatim.
+        self.assertNotIn(long_desc, ctx)
 
     def test_rate_limit_uses_remote_addr_not_xff(self):
         cache.clear()
         last = None
-        # Different XFF values each time — if XFF were honored, each would be a
-        # fresh bucket and the limit would never fire; it still fires after 10
-        # because REMOTE_ADDR (127.0.0.1) drives the counter.
+        # REMOTE_ADDR is pinned to 9.9.9.9 while the spoofable XFF value varies
+        # each request — if the limiter keyed on XFF, each request would be a
+        # fresh bucket and the limit would never fire. It fires after 10, which
+        # proves the counter is keyed on REMOTE_ADDR.
         for i in range(11):
             last = self.client.post(
                 "/chat/",
                 data={"message": "Q"},
                 content_type="application/json",
+                REMOTE_ADDR="9.9.9.9",
                 HTTP_X_FORWARDED_FOR=f"1.2.3.{i}",
             )
         self.assertEqual(last.status_code, 429)
