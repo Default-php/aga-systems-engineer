@@ -13,7 +13,11 @@ from apps.ai_assistant.constants import (
     RATE_LIMIT_TTL,
 )
 from apps.ai_assistant.models import ChatMessage
-from apps.ai_assistant.services import call_openrouter
+from apps.ai_assistant.services import (
+    OpenRouterDisabled,
+    OpenRouterError,
+    call_openrouter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +81,19 @@ def chat_api(request):
     else:
         try:
             answer = call_openrouter(messages, stream=False)
-        except Exception:
+        except OpenRouterDisabled:
+            # Known-bad key (recent 401/402/403) — don't call the API again;
+            # explain transparently instead of a generic error.
+            logger.warning("OpenRouter disabled; serving demo-mode answer")
+            answer = services.demo_mode_answer_rejected()
+        except OpenRouterError:
             logger.exception("OpenRouter call failed")
+            answer = (
+                "Sorry, the assistant is temporarily unavailable. "
+                "Please try again later."
+            )
+        except Exception:
+            logger.exception("Unexpected error in chat")
             answer = (
                 "Sorry, the assistant is temporarily unavailable. "
                 "Please try again later."

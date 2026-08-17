@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 CONTEXT_CACHE_KEY = "ai_assistant:context"
 CONTEXT_CACHE_TTL = 300  # 5 minutes
 
+# Circuit breaker: after an auth/payment rejection (401/402/403) we stop calling
+# OpenRouter for a while instead of hammering a known-bad key.
+CACHE_KEY_OPENROUTER_DISABLED = "openrouter:disabled_until"
+DISABLE_DURATION_SECONDS = 3600  # 1 hour
+
 # Per-field truncation limits applied when building the context string so
 # unbounded TextFields cannot blow up the prompt.
 FIELD_LIMITS = {"description": 500, "body": 500, "excerpt": 200}
@@ -25,6 +30,10 @@ FIELD_LIMITS = {"description": 500, "body": 500, "excerpt": 200}
 
 class OpenRouterError(Exception):
     """Raised when the OpenRouter API returns a non-2xx response."""
+
+
+class OpenRouterDisabled(OpenRouterError):
+    """OpenRouter is temporarily disabled after a recent API rejection."""
 
 
 def _shorten(value, field: str) -> str:
@@ -130,19 +139,38 @@ def system_prompt() -> str:
     )
 
 
-def demo_mode_answer() -> str:
+def demo_mode_answer_no_key() -> str:
     return (
-        "Demo mode: the chat assistant is wired up, but OPENROUTER_API_KEY is not "
-        "set. Add it to your environment to enable real answers."
+        "The AI assistant is in demo mode because no OpenRouter API key "
+        "is configured. Set OPENROUTER_API_KEY in the environment to "
+        "enable real answers."
     )
+
+
+def demo_mode_answer_rejected() -> str:
+    return (
+        "The AI assistant is in demo mode because the configured "
+        "OPENROUTER_API_KEY is being rejected by the API (likely invalid "
+        "or out of balance). Verify the key and its balance, then wait an "
+        "hour or clear the openrouter:disabled_until cache key."
+    )
+
+
+def demo_mode_answer() -> str:
+    # Backwards-compatible alias: "no key configured" demo-mode message.
+    return demo_mode_answer_no_key()
 
 
 def call_openrouter(messages, *, stream=False) -> str:
     """POST to the OpenRouter chat completions endpoint and return the answer text.
 
-    Raises :class:`OpenRouterError` on any non-2xx response. Callers must either
-    provide a key or use demo mode (see views).
+    Raises :class:`OpenRouterError` on any non-2xx response, or
+    :class:`OpenRouterDisabled` if the circuit breaker is open (a recent
+    401/402/403). Callers must either provide a key or use demo mode (see views).
     """
+    if cache.get(CACHE_KEY_OPENROUTER_DISABLED):
+        raise OpenRouterDisabled("OpenRouter disabled after a recent API rejection")
+
     api_key = getattr(settings, "OPENROUTER_API_KEY", "")
     if not api_key:
         raise OpenRouterError(
@@ -163,6 +191,12 @@ def call_openrouter(messages, *, stream=False) -> str:
         timeout=30,
     )
     if not response.ok:  # covers all 4xx and 5xx
+        if response.status_code in (401, 402, 403):
+            cache.set(
+                CACHE_KEY_OPENROUTER_DISABLED,
+                "1",
+                DISABLE_DURATION_SECONDS,
+            )
         raise OpenRouterError(
             f"openrouter {response.status_code}: {response.text[:300]}"
         )
