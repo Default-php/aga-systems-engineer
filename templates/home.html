@@ -65,7 +65,7 @@
       <div class="grid gap-6 md:grid-cols-3">
         {# Home projects are served from apps.projects (admin-managed). #}
         {% for project in projects %}
-          {% include "components/project_card.html" with title=project.title description=project.summary tags=project.tags_list url=project.get_absolute_url %}
+          {% include "components/project_card.html" with project=project title=project.title description=project.summary tags=project.tags_list url=project.get_absolute_url %}
         {% empty %}
           <p class="md:col-span-3 text-ink-muted">Add projects via the admin to populate this section.</p>
         {% endfor %}

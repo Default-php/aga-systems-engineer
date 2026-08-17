@@ -14,6 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
@@ -52,3 +54,8 @@ urlpatterns = [
     path("", include("apps.ai_assistant.urls")),
     path("certifications/", include("apps.certifications.urls")),
 ]
+
+# Dev-only media serving — Django doesn't serve /media/ automatically. In
+# production staticfiles are served by WhiteNoise and media by the web server.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
