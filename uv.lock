@@ -1,0 +1,14 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[manifest]
+
+[manifest.dependency-groups]
+dev = [{ name = "tailwindcss", specifier = ">=0.0.1" }]
+
+[[package]]
+name = "tailwindcss"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/f3/aa3b4800e559cd863bb09e3840c52de999e37c68edec5e42e97b510b7331/tailwindcss-0.0.1.tar.gz", hash = "sha256:2ba71105662701a522a13367844f7f5e8830456da69f30048291440431f8875b", size = 3025, upload-time = "2021-07-13T14:05:15.501Z" }

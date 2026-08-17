@@ -4,6 +4,8 @@ temp/
 AGENTS.md
 node_modules/
 static/css/dist/
+media/
+!media/.gitkeep
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

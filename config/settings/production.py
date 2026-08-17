@@ -6,8 +6,8 @@ from .base import *  # noqa: F401,F403
 from .base import MIDDLEWARE, env
 
 SECRET_KEY = env("SECRET_KEY")  # required, no default
-DEBUG = False
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["example.com"])
+DEBUG = True
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 db_url = env("DATABASE_URL", default=None)
 if not db_url:
@@ -45,8 +45,8 @@ SECURE_PROXY_SSL_HEADER = (
     if env.bool("SECURE_PROXY_SSL_HEADER_ENABLED", default=True)
     else None
 )
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
@@ -56,3 +56,8 @@ EMAIL_BACKEND = env(
 )
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", default="admin@example.com")
+
+# Testing
+#WHITENOISE_IGNORE_PATTERNS = [
+#    'css/src/*',  # Tells WhiteNoise to skip looking inside your uncompiled Tailwind files
+#]

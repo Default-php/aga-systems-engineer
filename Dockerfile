@@ -26,16 +26,25 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements/base.txt requirements/production.txt ./
+COPY requirements/ ./requirements/
 RUN pip install --no-cache-dir -r requirements/production.txt
 COPY . /app
 COPY --from=js-builder /app/static/css/dist /app/static/css/dist
-# collectstatic does not touch the DB; placeholder creds are only needed to
-# satisfy the production settings module.
+# Raw Tailwind source isn't a static asset — it's only input to the JS build,
+# which already happened in js-builder. Remove it so collectstatic doesn't
+# try to post-process the unresolved `@import "tailwindcss"` in it.
+RUN rm -rf static/css/src
+
 RUN DJANGO_SETTINGS_MODULE=config.settings.production \
     SECRET_KEY=collectstatic-secret-key \
     DATABASE_URL=postgres://placeholder@host:5432/db \
     python manage.py collectstatic --noinput
+# collectstatic does not touch the DB; placeholder creds are only needed to
+# satisfy the production settings module.
+#RUN DJANGO_SETTINGS_MODULE=config.settings.production \
+#    SECRET_KEY=collectstatic-secret-key \
+#    DATABASE_URL=postgres://placeholder@host:5432/db \
+#    python manage.py collectstatic --noinput
 
 # Stage 3: runtime
 FROM python:3.12-slim@sha256:ffd5d35f5cf6dfba89eaaebd93d5ad142faa7a7f2c728742c5b50cb81baff526 AS runtime
@@ -55,6 +64,9 @@ RUN apt-get update \
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash --uid 1000 app
+
+COPY --from=python-builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=python-builder /usr/local/bin /usr/local/bin
 
 COPY --from=python-builder /app /app
 RUN chown -R app:app /app
