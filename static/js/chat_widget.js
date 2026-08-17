@@ -30,7 +30,7 @@
   }
 
   openButton.addEventListener("click", function () {
-    setOpen(!panel.classList.contains("hidden"));
+    setOpen(panel.classList.contains("hidden"));
   });
   closeButton.addEventListener("click", function () {
     setOpen(false);
