@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.ai_assistant import services
@@ -232,3 +233,91 @@ class ChatApiTests(TestCase):
                 [{"role": "user", "content": "hi"}], stream=False
             )
         self.assertEqual(result, "Hello from the model.")
+
+
+class ChatApiFallbackTests(TestCase):
+    @override_settings(OPENROUTER_API_KEY="sk-fake-but-set")
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_returns_200_with_friendly_message_on_openrouter_error(
+        self, mock_call
+    ):
+        mock_call.side_effect = services.OpenRouterError("openrouter 401: anything")
+        resp = self.client.post(
+            reverse("ai_assistant:chat_api"),
+            data='{"message": "Hello"}',
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("answer", body)
+        # Friendly fallback, not the raw exception text.
+        self.assertNotIn("openrouter", body["answer"].lower())
+        self.assertNotIn("401", body["answer"])
+        self.assertTrue(
+            "unavailable" in body["answer"].lower()
+            or "try again" in body["answer"].lower(),
+            f"answer was: {body['answer']!r}",
+        )
+
+
+class CircuitBreakerTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_circuit_breaker_locks_out_after_401(self):
+        with (
+            override_settings(OPENROUTER_API_KEY="sk-fake"),
+            patch("apps.ai_assistant.services.requests.post") as mock_post,
+        ):
+            mock_post.return_value = MagicMock(
+                ok=False, status_code=401, text='{"error":"User not found.","code":401}'
+            )
+            # First call: raises OpenRouterError, breaker activates.
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            # Second call: should NOT call requests.post — short-circuits.
+            mock_post.reset_mock()
+            with self.assertRaises(services.OpenRouterDisabled):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            mock_post.assert_not_called()
+        cache.clear()
+
+    def test_circuit_breaker_does_not_trigger_on_500(self):
+        with (
+            override_settings(OPENROUTER_API_KEY="sk-fake"),
+            patch("apps.ai_assistant.services.requests.post") as mock_post,
+        ):
+            mock_post.return_value = MagicMock(
+                ok=False, status_code=500, text="server error"
+            )
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            # 500 does not open the breaker — a second call still hits the API.
+            mock_post.reset_mock()
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            mock_post.assert_called_once()
+        cache.clear()
+
+
+class ChatApiDemoModeTests(TestCase):
+    @override_settings(OPENROUTER_API_KEY="sk-fake-but-set")
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_returns_demo_mode_rejected_when_openrouter_disabled(
+        self,
+        mock_call,
+    ):
+        mock_call.side_effect = services.OpenRouterDisabled(
+            "OpenRouter disabled after a recent API rejection"
+        )
+        resp = self.client.post(
+            reverse("ai_assistant:chat_api"),
+            data='{"message": "Hello"}',
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("answer", body)
+        # Specific demo-mode-rejected phrase (NOT the generic "unavailable" text).
+        self.assertIn("rejected", body["answer"].lower())
+        self.assertNotIn("openrouter 401", body["answer"].lower())
