@@ -99,7 +99,7 @@ def chat_api(request):
                 "Please try again later."
             )
 
-    sources = services.source_links()
+    sources = services.extract_cited_sources(answer)
 
     session_key = request.session.session_key or "anonymous"
     ChatMessage.objects.create(

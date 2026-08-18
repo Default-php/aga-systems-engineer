@@ -6,6 +6,7 @@ the API implicitly.
 """
 
 import logging
+import re
 import textwrap
 
 import requests
@@ -146,11 +147,52 @@ def source_links() -> list:
     return sources
 
 
+_CITE_RE = re.compile(
+    # Markdown link: [text](url) where url is absolute or root-relative
+    r"\[([^\]]*)\]\((https?://[^)\s]+|/[^\s)]+)\)"
+    # or
+    r"|"
+    # Bare URL (with negative lookbehind to avoid eating parens/slashes around it)
+    r"(?<![\(\w/])(https?://[^\s)\]]+|/[a-zA-Z][^\s)\]]*)"
+)
+
+
+def extract_cited_sources(answer: str) -> list[dict]:
+    """Parse citations from the answer in document order, returning a
+    deduplicated list of {"title": ..., "url": ...} for each citation that
+    matches a known source URL.
+
+    The canonical URL list is `source_links()`. Citations to URLs outside that
+    list are silently dropped (don't expose external/internal URLs to the
+    visitor).
+    """
+    known = {entry["url"]: entry["title"] for entry in source_links()}
+    seen: set[str] = set()
+    out: list[dict] = []
+    for match in _CITE_RE.finditer(answer):
+        if match.group(1) is not None:
+            # Markdown link form
+            url = match.group(2)
+            title = match.group(1).strip() or known.get(url, "")
+        else:
+            # Bare URL form
+            url = match.group(3)
+            title = ""
+        url = url.rstrip(".,;:!?)}\"'`")
+        if url in known and url not in seen:
+            seen.add(url)
+            out.append({"title": title or known[url], "url": url})
+    return out
+
+
 def system_prompt() -> str:
     return (
         "You are Alfonso's portfolio AI assistant. Answer ONLY from the supplied "
-        "context. If unknown, say so. Always cite sources by their URL when possible. "
-        "Be concise."
+        "CONTEXT. If the answer is not in the CONTEXT, say so explicitly. "
+        "When you reference a project, post, certification, or section of the "
+        "portfolio, cite its URL inline as a markdown link [Title](url) — use "
+        "EXACTLY the URLs that appear in the CONTEXT (do not invent URLs). "
+        "Keep the response concise. Match the user's language."
     )
 
 
