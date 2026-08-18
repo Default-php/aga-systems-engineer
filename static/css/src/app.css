@@ -107,6 +107,39 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Chat widget — animated open/close + open button hover/press
+--------------------------------------------------------------------------- */
+
+@layer components {
+  /* Chat widget panel — animated open/close */
+  .chat-panel {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.97);
+    transition: opacity 200ms ease-out, transform 200ms ease-out;
+    pointer-events: none;
+    transform-origin: bottom right;
+  }
+  .chat-panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  /* Chat open button — soft hover/press */
+  .chat-open-btn {
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+  .chat-open-btn:hover {
+    transform: scale(1.04);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  }
+  .chat-open-btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    transition-duration: 80ms;
+  }
+}
+
 /* Respect OS-level reduced-motion preference (PROJECT.md: accessibility). */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,9 +1,9 @@
 {# Floating chat widget — include in base.html after main content #}
 <div id="chat-widget" class="fixed bottom-4 right-4 z-50" data-chat-url="{% url 'ai_assistant:chat_api' %}">
-  <button id="chat-open" type="button" class="btn btn-primary rounded-full px-4 py-2 shadow-lg" aria-label="Open chat assistant" aria-expanded="false" aria-controls="chat-panel">
+  <button id="chat-open" type="button" class="chat-open-btn btn btn-primary rounded-full px-4 py-2 shadow-lg" aria-label="Open chat assistant" aria-expanded="false" aria-controls="chat-panel">
     Ask about me
   </button>
-  <div id="chat-panel" class="hidden mt-2 w-80 sm:w-96 rounded-lg border border-edge bg-surface text-ink shadow-xl overflow-hidden">
+  <div id="chat-panel" class="chat-panel hidden mt-2 w-80 sm:w-96 rounded-lg border border-edge bg-surface text-ink shadow-xl overflow-hidden">
     <header class="flex items-center justify-between border-b border-edge px-4 py-2">
       <h2 class="text-sm font-medium">Ask about my work</h2>
       <button id="chat-close" type="button" class="text-ink-muted hover:text-ink" aria-label="Close chat">✕</button>
