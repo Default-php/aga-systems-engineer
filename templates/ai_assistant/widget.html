@@ -9,6 +9,10 @@
       <button id="chat-close" type="button" class="text-ink-muted hover:text-ink" aria-label="Close chat">✕</button>
     </header>
     <div id="chat-log" class="max-h-80 overflow-y-auto px-4 py-3 space-y-3 text-sm" aria-live="polite"></div>
+    <div id="chat-typing" class="chat-typing hidden" role="status" aria-live="polite" aria-label="Assistant is thinking">
+      <span class="sr-only">Assistant is thinking</span>
+      <span></span><span></span><span></span>
+    </div>
     <form id="chat-form" class="border-t border-edge flex" novalidate>
       <label for="chat-input" class="sr-only">Your question</label>
       <input id="chat-input" name="message" type="text" autocomplete="off" required maxlength="500" placeholder="e.g. What's your Django experience?" class="flex-1 bg-surface px-3 py-2 text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-accent">

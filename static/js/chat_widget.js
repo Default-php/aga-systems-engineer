@@ -148,6 +148,16 @@
     setOpen(false);
   });
 
+  function setTyping(visible) {
+    var el = document.getElementById("chat-typing");
+    if (!el) return;
+    if (visible) {
+      el.classList.remove("hidden");
+    } else {
+      el.classList.add("hidden");
+    }
+  }
+
   function appendMessage(text, who) {
     var el = document.createElement("div");
     el.className =
@@ -175,6 +185,7 @@
     input.disabled = true;
     submitButton.disabled = true;
 
+    setTyping(true);
     fetch(chatUrl, {
       method: "POST",
       headers: {
@@ -210,6 +221,7 @@
         appendMessage("Sorry, something went wrong. Please try again.", "assistant");
       })
       .finally(function () {
+        setTyping(false);
         input.disabled = false;
         submitButton.disabled = false;
         input.focus();

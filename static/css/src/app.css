@@ -138,6 +138,35 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
     transition-duration: 80ms;
   }
+  /* Chat typing indicator — animated 3-dot wave */
+  .chat-typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-edge);
+    border-radius: 0.75rem;
+    color: var(--color-accent);
+    width: fit-content;
+  }
+  .chat-typing span {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: chat-typing-bounce 1.2s infinite ease-in-out both;
+  }
+  .chat-typing span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .chat-typing span:nth-child(3) {
+    animation-delay: 0.30s;
+  }
+  @keyframes chat-typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-0.3rem); opacity: 1; }
+  }
 }
 
 /* Respect OS-level reduced-motion preference (PROJECT.md: accessibility). */
