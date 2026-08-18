@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.ai_assistant import services
 from apps.ai_assistant.models import ChatMessage
 from apps.blog.models import Post
+from apps.certifications.models import Certification
 from apps.experience.models import Experience
 from apps.projects.models import Project
 from apps.skills.models import Category, Skill
@@ -112,6 +113,7 @@ class ChatApiTests(TestCase):
         self.assertContains(response, 'id="chat-widget"')
         self.assertContains(response, "data-chat-url")
 
+    @override_settings(OPENROUTER_MODEL="openrouter/auto:free")
     @patch("apps.ai_assistant.services.requests.post")
     def test_openrouter_call_format(self, mock_post):
         mock_resp = MagicMock()
@@ -321,3 +323,225 @@ class ChatApiDemoModeTests(TestCase):
         # Specific demo-mode-rejected phrase (NOT the generic "unavailable" text).
         self.assertIn("rejected", body["answer"].lower())
         self.assertNotIn("openrouter 401", body["answer"].lower())
+
+
+class ContextBuilderTests(TestCase):
+    """Direct unit tests for build_context()/source_links() assembly."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.category = Category.objects.create(name="Backend", slug="backend")
+        cls.project = Project.objects.create(
+            title="Period Project",
+            slug="period-project",
+            summary="Built with Django and Postgres.",
+            tags_csv="",
+        )
+        cls.cert_with_url = Certification.objects.create(
+            name="AWS Certified",
+            issuer="Amazon",
+            date_obtained=date(2023, 5, 1),
+            credential_url="https://example.com/verify/abc",
+        )
+        cls.cert_without_url = Certification.objects.create(
+            name="No URL Cert",
+            issuer="Some Org",
+            date_obtained=date(2022, 5, 1),
+            credential_url="",
+        )
+
+    def test_build_context_no_double_period_after_summary_ending_in_period(self):
+        ctx = services.build_context()
+        line = next(
+            line
+            for line in ctx.splitlines()
+            if line.startswith(f"- {self.project.title} (")
+        )
+        self.assertNotIn("..", line)
+        self.assertIn("Built with Django and Postgres. Tags:", line)
+
+    def test_source_links_includes_per_cert_credential_url(self):
+        sources = services.source_links()
+        by_title = {s["title"]: s["url"] for s in sources}
+        self.assertEqual(by_title["AWS Certified"], "https://example.com/verify/abc")
+        self.assertEqual(by_title["No URL Cert"], reverse("certifications:list"))
+
+    def test_source_links_empty_when_no_projects_posts_or_certifications(self):
+        # Empty-DB scenario: delete all projects/posts/certs. Skills/experience
+        # remain but are never source entries.
+        Project.objects.all().delete()
+        Post.objects.all().delete()
+        Certification.objects.all().delete()
+        self.assertEqual(services.source_links(), [])
+
+
+class ContextRowCapTests(TestCase):
+    """build_context() must cap each section's row count (A4)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Project.objects.bulk_create(
+            Project(
+                title=f"Cap Project {i}",
+                slug=f"cap-project-{i}",
+                summary="short",
+            )
+            for i in range(7)
+        )
+        Post.objects.bulk_create(
+            Post(
+                title=f"Cap Post {i}",
+                slug=f"cap-post-{i}",
+                body="body",
+                is_draft=False,
+                published_at=timezone.now(),
+            )
+            for i in range(7)
+        )
+        Experience.objects.bulk_create(
+            Experience(
+                title=f"Cap Role {i}",
+                organization="Org",
+                start_date=date(2020 + i, 1, 1),
+            )
+            for i in range(11)
+        )
+        Certification.objects.bulk_create(
+            Certification(
+                name=f"Cap Cert {i}",
+                issuer="Issuer",
+                date_obtained=date(2020 + i, 1, 1),
+            )
+            for i in range(21)
+        )
+
+    @staticmethod
+    def _section_lines(ctx: str, header: str) -> list:
+        """Lines starting with '- ' that belong to the named context section."""
+        lines = ctx.splitlines()
+        try:
+            start = lines.index(header)
+        except ValueError:
+            return []
+        section = []
+        for line in lines[start + 1 :]:  # noqa: E203 (black slice style)
+            if line.startswith("- "):
+                section.append(line)
+            elif line:
+                break  # next section header
+        return section
+
+    def test_build_context_caps_projects(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "PROJECTS:")),
+            services.MAX_PROJECT_ROWS,
+        )
+
+    def test_build_context_caps_posts(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "BLOG POSTS:")),
+            services.MAX_BLOG_ROWS,
+        )
+
+    def test_build_context_caps_experience(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "EXPERIENCE:")),
+            services.MAX_EXPERIENCE_ROWS,
+        )
+
+    def test_build_context_caps_certifications(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "CERTIFICATIONS:")),
+            services.MAX_CERTIFICATION_ROWS,
+        )
+
+    def test_projects_ordered_featured_first(self):
+        # Create 6 projects: 3 featured, 3 not; varied display_orders so the
+        # natural insertion order differs from the desired order.
+        Project.objects.all().delete()
+        Project.objects.create(
+            title="Featured-A",
+            slug="f-a",
+            summary="A",
+            featured=True,
+            display_order=10,
+        )
+        Project.objects.create(
+            title="NotFeatured-A",
+            slug="nf-a",
+            summary="A",
+            featured=False,
+            display_order=0,
+        )
+        Project.objects.create(
+            title="Featured-B",
+            slug="f-b",
+            summary="B",
+            featured=True,
+            display_order=5,
+        )
+        Project.objects.create(
+            title="NotFeatured-B",
+            slug="nf-b",
+            summary="B",
+            featured=False,
+            display_order=1,
+        )
+        Project.objects.create(
+            title="Featured-C",
+            slug="f-c",
+            summary="C",
+            featured=True,
+            display_order=1,
+        )
+        Project.objects.create(
+            title="NotFeatured-C",
+            slug="nf-c",
+            summary="C",
+            featured=False,
+            display_order=2,
+        )
+        # Cap = 5 → top 5 from ("-featured", "display_order", "-created_at"):
+        # featured rows first (all featured=true), then display_order asc.
+        # Within featured: (F-C,1),(F-B,5),(F-A,10). The top-5 cap covers all 3
+        # featured + 2 of 3 non-featured.
+        ctx = services.build_context()
+        section = self._section_lines(ctx, "PROJECTS:")
+        # 5 lines (cap).
+        self.assertEqual(len(section), 5)
+        # First three lines are featured, ordered by display_order asc.
+        first_three = [line.split(" (")[0] for line in section[:3]]
+        self.assertEqual(first_three, ["- Featured-C", "- Featured-B", "- Featured-A"])
+        # Last two are non-featured (display_order asc: NF-A(0), NF-B(1)).
+        last_two_titles = [line.split(" (")[0] for line in section[3:]]
+        self.assertEqual(last_two_titles, ["- NotFeatured-A", "- NotFeatured-B"])
+
+
+class CategoryCacheInvalidationTests(TestCase):
+    """A3 — Category saves/deletes must invalidate the context cache."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cat = Category.objects.create(
+            name="Backend", slug="backend", display_order=0
+        )
+        Skill.objects.create(name="Django", category=cls.cat, level="advanced")
+        cls.cat.refresh_from_db()
+
+    def test_category_save_invalidates_context_cache(self):
+        cache.set(services.CONTEXT_CACHE_KEY, "warm", 300)
+        self.cat.name = "Backend & Platform"
+        self.cat.save()
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+
+    def test_category_delete_invalidates_context_cache(self):
+        cat = self.cat.__class__.objects.create(
+            name="Frontend", slug="frontend", display_order=1
+        )
+        cache.set(services.CONTEXT_CACHE_KEY, "warm", 300)
+        cat.delete()
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
