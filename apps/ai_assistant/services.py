@@ -18,6 +18,8 @@ from apps.ai_assistant.constants import (
     MAX_BLOG_ROWS,
     MAX_CERTIFICATION_ROWS,
     MAX_EXPERIENCE_ROWS,
+    MAX_HISTORY_CHARS,
+    MAX_HISTORY_TURNS,
     MAX_PROJECT_ROWS,
 )
 
@@ -126,6 +128,43 @@ def get_context() -> str:
     context = build_context()
     cache.set(CONTEXT_CACHE_KEY, context, CONTEXT_CACHE_TTL)
     return context
+
+
+def history_messages(session_key: str) -> list[dict]:
+    """Return the recent conversation history for `session_key` as a list of
+    OpenAI-style message dicts (alternating user/assistant). Returns [] for
+    anonymous sessions (defense against cross-user leakage via the shared
+    "anonymous" bucket).
+    """
+    if not session_key or session_key == "anonymous":
+        return []
+    from apps.ai_assistant.models import ChatMessage
+
+    # Pull the most recent N turns (each turn = 1 user + 1 assistant).
+    # Fetch extra rows so we can assemble turns properly.
+    rows = list(
+        ChatMessage.objects.filter(session_key=session_key).order_by(
+            "-created_at", "-pk"
+        )[: MAX_HISTORY_TURNS * 2]
+    )
+    rows.reverse()  # oldest → newest
+    # Keep only the most recent MAX_HISTORY_TURNS turns (each row is one turn).
+    rows = rows[-MAX_HISTORY_TURNS:]
+    out = []
+    total = 0
+    for row in rows:
+        user = {"role": "user", "content": row.user_message}
+        assistant = {"role": "assistant", "content": row.assistant_reply}
+        projected = total + len(user["content"]) + len(assistant["content"])
+        if projected > MAX_HISTORY_CHARS:
+            # Skip turns larger than the cap rather than truncate
+            # mid-message. `continue` (not `break`) preserves later
+            # shorter turns that may still fit.
+            continue
+        out.append(user)
+        out.append(assistant)
+        total = projected
+    return out
 
 
 def source_links() -> list:

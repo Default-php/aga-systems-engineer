@@ -14,6 +14,11 @@ MAX_BLOG_ROWS = 5
 MAX_EXPERIENCE_ROWS = 10  # keep this slightly higher
 MAX_CERTIFICATION_ROWS = 20
 
+# History window for multi-turn chat: 4 = 4 user + 4 assistant messages,
+# and a hard character cap so the prompt cannot grow without bound.
+MAX_HISTORY_TURNS = 4
+MAX_HISTORY_CHARS = 4000
+
 MAX_MESSAGE_LENGTH = 500
 RATE_LIMIT_KEY = "ai_assistant:chat:{}"
 RATE_LIMIT_MAX = 10

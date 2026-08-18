@@ -32,6 +32,10 @@ def _client_ip(request) -> str:
     return request.META.get("REMOTE_ADDR", "")
 
 
+def _session_key_for_request(request) -> str:
+    return request.session.session_key or "anonymous"
+
+
 def _rate_limited(ip: str) -> bool:
     key = RATE_LIMIT_KEY.format(ip)
     count = services.cache.get(key, 0)
@@ -66,12 +70,15 @@ def chat_api(request):
             {"error": "Rate limit exceeded. Please try again later."}, status=429
         )
 
+    session_key = _session_key_for_request(request)
+    history = services.history_messages(session_key)
     context = services.get_context()
     messages = [
         {
             "role": "system",
             "content": services.system_prompt() + "\n\nCONTEXT:\n" + context,
         },
+        *history,
         {"role": "user", "content": message},
     ]
 
@@ -101,7 +108,6 @@ def chat_api(request):
 
     sources = services.extract_cited_sources(answer)
 
-    session_key = request.session.session_key or "anonymous"
     ChatMessage.objects.create(
         session_key=session_key,
         user_message=message,
