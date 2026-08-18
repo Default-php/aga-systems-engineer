@@ -122,14 +122,15 @@
     if (open) {
       openButton.setAttribute("aria-expanded", "true");
       panel.classList.remove("hidden");
-      // Force a layout flush so the browser registers the closed state before
-      // we apply the open state (which is what makes the transition animate).
-      openRaf = requestAnimationFrame(function () {
-        openRaf = null;
-        panel.classList.add("is-open");
-        var input = document.getElementById("chat-input");
-        if (input) input.focus();
-      });
+      // Force a synchronous reflow so the browser registers the closed state
+      // before we apply the open state — this makes the CSS transition animate
+      // even though both class changes happen in the same tick. rAF was tried
+      // here originally, but it can fail to fire (background tabs, content
+      // blockers, browser quirks) — a reflow read is synchronous and reliable.
+      void panel.offsetHeight;
+      panel.classList.add("is-open");
+      var input = document.getElementById("chat-input");
+      if (input) input.focus();
     } else {
       openButton.setAttribute("aria-expanded", "false");
       panel.classList.remove("is-open");
