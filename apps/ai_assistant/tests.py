@@ -648,3 +648,145 @@ class CategoryCacheInvalidationTests(TestCase):
         cache.set(services.CONTEXT_CACHE_KEY, "warm", 300)
         cat.delete()
         self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+
+
+class ChatHistoryTests(TestCase):
+    """Multi-turn history: session-scoped, anonymous-excluded, bounded."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.ai_assistant.services import history_messages
+
+        cls.fetch = history_messages
+
+    def test_anonymous_session_returns_empty(self):
+        self.assertEqual(self.fetch("anonymous"), [])
+        self.assertEqual(self.fetch(""), [])
+        self.assertEqual(self.fetch(None), [])
+
+    def test_real_session_returns_alternating_user_assistant(self):
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="Q1", assistant_reply="A1"
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="Q2", assistant_reply="A2"
+        )
+        msgs = self.fetch("user-abc")
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "Q1"},
+                {"role": "assistant", "content": "A1"},
+                {"role": "user", "content": "Q2"},
+                {"role": "assistant", "content": "A2"},
+            ],
+        )
+
+    def test_history_capped_by_max_turns(self):
+        # Create 6 turns; only MAX_HISTORY_TURNS = 4 most recent are returned.
+        for i in range(6):
+            ChatMessage.objects.create(
+                session_key="user-abc",
+                user_message=f"Q{i}",
+                assistant_reply=f"A{i}",
+            )
+        msgs = self.fetch("user-abc")
+        # Expect 4 turns = 8 messages; the OLDEST 2 are dropped (Q0/Q1/A0/A1).
+        self.assertEqual(len(msgs), 8)
+        self.assertEqual(msgs[0]["content"], "Q2")
+        self.assertEqual(msgs[-1]["content"], "A5")
+
+    def test_history_capped_by_max_chars(self):
+        # First turn: 6000 chars total (3000 user + 3000 assistant).
+        # This single turn exceeds MAX_HISTORY_CHARS (4000), so it should
+        # be SKIPPED — not included (and not truncated).
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="x" * 3000,
+            assistant_reply="y" * 3000,
+        )
+        # Second turn: 2000 chars total (small enough).
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="ok",
+            assistant_reply="ok",
+        )
+        msgs = self.fetch("user-abc")
+        # First turn is 6000 chars total > 4000 cap → skipped. Only the second tiny turn fits.
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "ok"},
+                {"role": "assistant", "content": "ok"},
+            ],
+        )
+
+    def test_history_skips_oversized_keeps_subsequent_smaller(self):
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="x" * 4000,
+            assistant_reply="y" * 4000,
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="Q",
+            assistant_reply="A",
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="Q2",
+            assistant_reply="A2",
+        )
+        msgs = self.fetch("user-abc")
+        # First turn is 8000 chars > 4000 cap → skipped. The other two fit.
+        # Exact content assertion: only the two smaller turns, in chronological order.
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "Q"},
+                {"role": "assistant", "content": "A"},
+                {"role": "user", "content": "Q2"},
+                {"role": "assistant", "content": "A2"},
+            ],
+        )
+
+    def test_session_isolation(self):
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="abc-msg", assistant_reply="abc-reply"
+        )
+        ChatMessage.objects.create(
+            session_key="user-xyz", user_message="xyz-msg", assistant_reply="xyz-reply"
+        )
+        self.assertEqual(
+            [m["content"] for m in self.fetch("user-abc")], ["abc-msg", "abc-reply"]
+        )
+        self.assertEqual(
+            [m["content"] for m in self.fetch("user-xyz")], ["xyz-msg", "xyz-reply"]
+        )
+
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_includes_history_in_messages(self, mock_call):
+        ChatMessage.objects.create(
+            session_key="user-vw", user_message="prior Q", assistant_reply="prior A"
+        )
+        mock_call.return_value = "ok"
+        with (
+            patch(
+                "apps.ai_assistant.views._session_key_for_request",
+                return_value="user-vw",
+            ),
+            override_settings(OPENROUTER_API_KEY="test-key"),
+        ):
+            self.client.post(
+                reverse("ai_assistant:chat_api"),
+                data='{"message": "new Q"}',
+                content_type="application/json",
+            )
+        self.assertEqual(mock_call.call_count, 1)
+        messages = mock_call.call_args[0][0]
+        # System message, then prior history (2 entries), then the new user turn.
+        self.assertEqual(len(messages), 4)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[1], {"role": "user", "content": "prior Q"})
+        self.assertEqual(messages[2], {"role": "assistant", "content": "prior A"})
+        self.assertEqual(messages[3], {"role": "user", "content": "new Q"})
