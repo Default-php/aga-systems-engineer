@@ -8,11 +8,114 @@ from django.utils import timezone
 
 from apps.ai_assistant import services
 from apps.ai_assistant.models import ChatMessage
+from apps.ai_assistant.services import extract_cited_sources
 from apps.blog.models import Post
 from apps.certifications.models import Certification
 from apps.experience.models import Experience
 from apps.projects.models import Project
 from apps.skills.models import Category, Skill
+
+
+class AnswerCitationExtractionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # One project with a known URL; one cert with an absolute credential_url.
+        cls.project = Project.objects.create(
+            title="My Project",
+            slug="my-project",
+            summary="A project",
+        )
+        cls.cert = Certification.objects.create(
+            name="My Cert",
+            issuer="ACME",
+            date_obtained="2024-01-01",
+            credential_url="https://acme.test/verify/xyz",
+        )
+
+    def test_markdown_link_is_extracted(self):
+        url = self.project.get_absolute_url()
+        answer = f"This is described in [My Project]({url})."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(sources, [{"title": "My Project", "url": url}])
+
+    def test_bare_path_is_extracted(self):
+        url = self.project.get_absolute_url()
+        answer = f"See {url} for details."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["url"], url)
+
+    def test_bare_absolute_url_is_extracted(self):
+        url = self.cert.credential_url
+        answer = f"Verify at {url}."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["url"], url)
+
+    def test_unknown_url_is_dropped(self):
+        # URL not in the source_links list.
+        answer = "External link: [spammy](https://spammy.example/path)."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(sources, [])
+
+    def test_deduplication_across_markdown_and_bare(self):
+        url = self.project.get_absolute_url()
+        answer = f"Both [link]({url}) and bare {url} appear."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1, "duplicate citations must be deduped")
+
+    def test_multiple_distinct_citations(self):
+        url_a = self.project.get_absolute_url()
+        url_b = self.cert.credential_url
+        answer = f"See [project]({url_a}) and verify at {url_b}."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 2)
+        # Order is preserved (markdown first, then bare URL).
+        self.assertEqual(sources[0]["url"], url_a)
+        self.assertEqual(sources[1]["url"], url_b)
+
+    def test_citations_in_appearance_order(self):
+        """Markdown link after bare URL — citations returned in document order."""
+        url = self.project.get_absolute_url()
+        cert_url = self.cert.credential_url
+        answer = f"First bare {url} then [Cert]({cert_url})."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 2)
+        self.assertEqual(
+            sources[0]["url"], url, "bare URL first in answer must come first"
+        )
+        self.assertEqual(sources[1]["url"], cert_url)
+
+    def test_trailing_delimiters_stripped(self):
+        """Each trailing-delimiter variant is asserted independently."""
+        url = self.project.get_absolute_url()
+        cases = [
+            ("period", f"See {url}."),
+            ("comma", f"Or {url},"),
+            ("single-quotes", f"'{url}'"),
+            ("backticks", f"`{url}`"),
+            ("semicolon", f"{url};"),
+            ("colon", f"{url}:"),
+            ("exclamation", f"{url}!"),
+            ("question", f"{url}?"),
+            (
+                "closing-brace",
+                f"end {url}}}",
+            ),  # URL immediately followed by }; rstrip must remove it
+        ]
+        for label, text in cases:
+            with self.subTest(case=label):
+                sources = extract_cited_sources(text)
+                self.assertEqual(
+                    len(sources),
+                    1,
+                    f"case {label!r}: expected 1 source, got {sources!r}",
+                )
+                self.assertEqual(
+                    sources[0]["url"],
+                    url,
+                    f"case {label!r}: trailing delimiter not stripped",
+                )
 
 
 @override_settings(OPENROUTER_API_KEY="")
