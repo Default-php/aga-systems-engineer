@@ -13,6 +13,13 @@ from django.conf import settings
 from django.core.cache import cache
 from django.urls import reverse
 
+from apps.ai_assistant.constants import (
+    MAX_BLOG_ROWS,
+    MAX_CERTIFICATION_ROWS,
+    MAX_EXPERIENCE_ROWS,
+    MAX_PROJECT_ROWS,
+)
+
 logger = logging.getLogger(__name__)
 
 CONTEXT_CACHE_KEY = "ai_assistant:context"
@@ -58,13 +65,19 @@ def build_context() -> str:
 
     lines = []
 
-    projects = list(Project.objects.all())
+    projects = list(
+        Project.objects.order_by("-featured", "display_order", "-created_at")[
+            :MAX_PROJECT_ROWS
+        ]
+    )
     if projects:
         lines.append("PROJECTS:")
         for p in projects:
             tags = ", ".join(p.tags_list) or "—"
+            summary = p.summary or ""
+            period = "" if summary.rstrip().endswith((".", "!", "?")) else "."
             lines.append(
-                f"- {p.title} ({p.get_absolute_url()}): {p.summary}. Tags: {tags}"
+                f"- {p.title} ({p.get_absolute_url()}): {summary}{period} Tags: {tags}"
             )
 
     for cat in Category.objects.prefetch_related("skills").all():
@@ -74,7 +87,7 @@ def build_context() -> str:
         lines.append(f"SKILLS — {cat.name}:")
         lines.append(", ".join(f"{s.name} ({s.level_display})" for s in skills))
 
-    experience = list(Experience.objects.all())
+    experience = list(Experience.objects.all()[:MAX_EXPERIENCE_ROWS])
     if experience:
         lines.append("EXPERIENCE:")
         for e in experience:
@@ -83,7 +96,7 @@ def build_context() -> str:
                 f"{_shorten(e.description, 'description')}"
             )
 
-    certs = list(Certification.objects.all())
+    certs = list(Certification.objects.all()[:MAX_CERTIFICATION_ROWS])
     if certs:
         lines.append("CERTIFICATIONS:")
         cert_list_url = reverse("certifications:list")
@@ -92,7 +105,7 @@ def build_context() -> str:
                 f"- {c.name} — {c.issuer} ({c.date_display}); list: {cert_list_url}"
             )
 
-    posts = list(Post.published.all())
+    posts = list(Post.published.all()[:MAX_BLOG_ROWS])
     if posts:
         lines.append("BLOG POSTS:")
         for post in posts:
@@ -117,6 +130,7 @@ def get_context() -> str:
 def source_links() -> list:
     """Structured list of URLs the visitor can jump to."""
     from apps.blog.models import Post
+    from apps.certifications.models import Certification
     from apps.projects.models import Project
 
     sources = []
@@ -124,10 +138,11 @@ def source_links() -> list:
         sources.append({"title": p.title, "url": p.get_absolute_url()})
     for post in Post.published.all():
         sources.append({"title": post.title, "url": post.get_absolute_url()})
-    if sources:
-        sources.append(
-            {"title": "Certifications", "url": reverse("certifications:list")}
-        )
+    for c in Certification.objects.all():
+        if c.credential_url:
+            sources.append({"title": c.name, "url": c.credential_url})
+        else:
+            sources.append({"title": c.name, "url": reverse("certifications:list")})
     return sources
 
 
