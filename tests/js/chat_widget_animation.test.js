@@ -158,7 +158,7 @@ function loadWidget(timers) {
   };
 }
 
-test("open: removes hidden, then adds is-open via rAF", () => {
+test("open: removes hidden, then adds is-open synchronously", () => {
   const timers = createTimers();
   const { elements, restore } = loadWidget(timers);
   try {
@@ -167,10 +167,31 @@ test("open: removes hidden, then adds is-open via rAF", () => {
     assert.ok(panel.classList.contains("hidden"), "panel starts hidden");
     open.listeners.click();
     assert.ok(!panel.classList.contains("hidden"), "hidden removed first");
-    assert.ok(panel.classList.contains("is-open"), "is-open added after rAF flush");
+    assert.ok(panel.classList.contains("is-open"), "is-open added synchronously after click");
     assert.equal(open.attrs["aria-expanded"], "true", "aria-expanded syncs to true");
     assert.equal(elements["chat-input"].focusCount, 1, "input focused when panel opens");
   } finally {
+    restore();
+  }
+});
+
+test("open still works when requestAnimationFrame does not fire", () => {
+  const timers = createTimers();
+  const realRaf = globalThis.requestAnimationFrame;
+  const { elements, restore } = loadWidget(timers);
+  try {
+    // Simulate a throttled/unavailable rAF (background tab, content blocker):
+    // the callback is never invoked, so the open path must not depend on it.
+    globalThis.requestAnimationFrame = () => 0;
+    const panel = elements["chat-panel"];
+    const open = elements["chat-open"];
+    assert.ok(panel.classList.contains("hidden"), "panel starts hidden");
+    open.listeners.click();
+    assert.ok(!panel.classList.contains("hidden"), "hidden removed without rAF");
+    assert.ok(panel.classList.contains("is-open"), "is-open added synchronously without rAF");
+    assert.equal(open.attrs["aria-expanded"], "true", "aria-expanded syncs to true");
+  } finally {
+    globalThis.requestAnimationFrame = realRaf;
     restore();
   }
 });
@@ -214,15 +235,15 @@ test("re-open during close animation cancels the timeout", () => {
   }
 });
 
-test("idempotent: clicking open while already open does not re-fire requestAnimationFrame", () => {
+test("idempotent: clicking open while already open does not re-fire rAF", () => {
   const timers = createTimers();
   const { elements, rafCount, restore } = loadWidget(timers);
   try {
     const panel = elements["chat-panel"];
     const open = elements["chat-open"];
     const close = elements["chat-close"];
-    open.listeners.click(); // initial open — exactly one rAF
-    assert.equal(rafCount(), 1, "exactly one rAF for the initial open");
+    open.listeners.click(); // initial open — open path no longer schedules rAF
+    assert.equal(rafCount(), 0, "open path schedules no rAF");
     const rafCountBefore = rafCount();
     open.listeners.click(); // already open — toggles closed without scheduling rAF
     assert.equal(rafCount(), rafCountBefore, "no extra rAF when already open");
