@@ -6,6 +6,9 @@
   <section class="section">
     <div class="container-page max-w-3xl">
       <a href="{% url "projects:list" %}" class="text-sm text-ink-muted hover:text-ink">← All projects</a>
+      {% if project.image %}
+        <img src="{{ project.image.url }}" alt="{{ project.title }}" class="mt-4 w-full rounded-md aspect-video object-cover">
+      {% endif %}
       <h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{{ project.title }}</h1>
       <p class="mt-3 text-lg text-ink-muted">{{ project.summary }}</p>
       {% if project.tags_list %}

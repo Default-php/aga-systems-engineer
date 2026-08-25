@@ -26,10 +26,38 @@ _SITE_DESCRIPTION = (
 
 SITE_DESCRIPTION = env("SITE_DESCRIPTION", default=_SITE_DESCRIPTION)
 
-# OpenRouter — RAG chat assistant (task 4.5). Empty key enables demo mode.
+# OpenRouter — RAG chat assistant. Empty key enables demo mode.
 OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
 OPENROUTER_MODEL = env("OPENROUTER_MODEL", default="openrouter/auto:free")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+# Cache: shared Redis when REDIS_URL is set (production); per-process
+# LocMemCache otherwise (dev).
+_redis_url = env("REDIS_URL", default="")
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # Degrade gracefully when Redis is unreachable instead of
+                # raising on every request: cache falls back to DB rebuilds,
+                # rate-limit counters read as zero (permissive during an
+                # outage, bounded by the per-IP/10h window), and a lost
+                # circuit-breaker state defaults to "not broken" so the next
+                # OpenRouter call re-arms it on a 401.
+                "IGNORE_EXCEPTIONS": True,
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 
 
 # Application definition

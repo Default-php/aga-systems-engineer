@@ -37,7 +37,12 @@ class TestSettingsSplit(unittest.TestCase):
     def _run(self, env_updates, code):
         env = dict(os.environ)
         env["PYTHONPATH"] = str(Path(self._tmp))
-        for key in ("DJANGO_SETTINGS_MODULE", "SECRET_KEY", "DATABASE_URL"):
+        for key in (
+            "DJANGO_SETTINGS_MODULE",
+            "SECRET_KEY",
+            "DATABASE_URL",
+            "REDIS_URL",
+        ):
             env.pop(key, None)
         env.update(env_updates)
         return subprocess.run(
@@ -118,3 +123,37 @@ class TestSettingsSplit(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SECRET_KEY", result.stderr)
+
+    def test_cache_backend_is_locmem_without_redis_url(self):
+        result = self._run(
+            {},
+            "import config.settings, django; django.setup(); "
+            "from django.conf import settings; "
+            "print(settings.CACHES['default']['BACKEND'])",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("django.core.cache.backends.locmem.LocMemCache", result.stdout)
+
+    def test_cache_backend_is_redis_with_redis_url(self):
+        result = self._run(
+            {"REDIS_URL": "redis://localhost:6379/15"},
+            "import config.settings, django; django.setup(); "
+            "from django.conf import settings; "
+            "print(settings.CACHES['default']['BACKEND'])",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("django_redis.cache.RedisCache", result.stdout)
+
+    def test_redis_cache_options_have_ignore_exceptions(self):
+        # When REDIS_URL is set, the OPTIONS dict must include
+        # IGNORE_EXCEPTIONS=True so an unreachable Redis degrades to cache
+        # misses instead of raising connection errors on every request.
+        result = self._run(
+            {"REDIS_URL": "redis://localhost:6379/15"},
+            "import config.settings, django; django.setup(); "
+            "from django.conf import settings; "
+            "opts = settings.CACHES['default']['OPTIONS']; "
+            "print(opts.get('IGNORE_EXCEPTIONS'))",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("True", result.stdout)

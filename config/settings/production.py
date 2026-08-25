@@ -6,7 +6,7 @@ from .base import *  # noqa: F401,F403
 from .base import MIDDLEWARE, env
 
 SECRET_KEY = env("SECRET_KEY")  # required, no default
-DEBUG = True
+DEBUG = False
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 db_url = env("DATABASE_URL", default=None)

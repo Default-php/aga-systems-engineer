@@ -3,14 +3,119 @@ from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.ai_assistant import services
 from apps.ai_assistant.models import ChatMessage
+from apps.ai_assistant.services import extract_cited_sources
 from apps.blog.models import Post
+from apps.certifications.models import Certification
 from apps.experience.models import Experience
 from apps.projects.models import Project
 from apps.skills.models import Category, Skill
+
+
+class AnswerCitationExtractionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # One project with a known URL; one cert with an absolute credential_url.
+        cls.project = Project.objects.create(
+            title="My Project",
+            slug="my-project",
+            summary="A project",
+        )
+        cls.cert = Certification.objects.create(
+            name="My Cert",
+            issuer="ACME",
+            date_obtained="2024-01-01",
+            credential_url="https://acme.test/verify/xyz",
+        )
+
+    def test_markdown_link_is_extracted(self):
+        url = self.project.get_absolute_url()
+        answer = f"This is described in [My Project]({url})."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(sources, [{"title": "My Project", "url": url}])
+
+    def test_bare_path_is_extracted(self):
+        url = self.project.get_absolute_url()
+        answer = f"See {url} for details."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["url"], url)
+
+    def test_bare_absolute_url_is_extracted(self):
+        url = self.cert.credential_url
+        answer = f"Verify at {url}."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["url"], url)
+
+    def test_unknown_url_is_dropped(self):
+        # URL not in the source_links list.
+        answer = "External link: [spammy](https://spammy.example/path)."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(sources, [])
+
+    def test_deduplication_across_markdown_and_bare(self):
+        url = self.project.get_absolute_url()
+        answer = f"Both [link]({url}) and bare {url} appear."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 1, "duplicate citations must be deduped")
+
+    def test_multiple_distinct_citations(self):
+        url_a = self.project.get_absolute_url()
+        url_b = self.cert.credential_url
+        answer = f"See [project]({url_a}) and verify at {url_b}."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 2)
+        # Order is preserved (markdown first, then bare URL).
+        self.assertEqual(sources[0]["url"], url_a)
+        self.assertEqual(sources[1]["url"], url_b)
+
+    def test_citations_in_appearance_order(self):
+        """Markdown link after bare URL — citations returned in document order."""
+        url = self.project.get_absolute_url()
+        cert_url = self.cert.credential_url
+        answer = f"First bare {url} then [Cert]({cert_url})."
+        sources = extract_cited_sources(answer)
+        self.assertEqual(len(sources), 2)
+        self.assertEqual(
+            sources[0]["url"], url, "bare URL first in answer must come first"
+        )
+        self.assertEqual(sources[1]["url"], cert_url)
+
+    def test_trailing_delimiters_stripped(self):
+        """Each trailing-delimiter variant is asserted independently."""
+        url = self.project.get_absolute_url()
+        cases = [
+            ("period", f"See {url}."),
+            ("comma", f"Or {url},"),
+            ("single-quotes", f"'{url}'"),
+            ("backticks", f"`{url}`"),
+            ("semicolon", f"{url};"),
+            ("colon", f"{url}:"),
+            ("exclamation", f"{url}!"),
+            ("question", f"{url}?"),
+            (
+                "closing-brace",
+                f"end {url}}}",
+            ),  # URL immediately followed by }; rstrip must remove it
+        ]
+        for label, text in cases:
+            with self.subTest(case=label):
+                sources = extract_cited_sources(text)
+                self.assertEqual(
+                    len(sources),
+                    1,
+                    f"case {label!r}: expected 1 source, got {sources!r}",
+                )
+                self.assertEqual(
+                    sources[0]["url"],
+                    url,
+                    f"case {label!r}: trailing delimiter not stripped",
+                )
 
 
 @override_settings(OPENROUTER_API_KEY="")
@@ -111,6 +216,7 @@ class ChatApiTests(TestCase):
         self.assertContains(response, 'id="chat-widget"')
         self.assertContains(response, "data-chat-url")
 
+    @override_settings(OPENROUTER_MODEL="openrouter/auto:free")
     @patch("apps.ai_assistant.services.requests.post")
     def test_openrouter_call_format(self, mock_post):
         mock_resp = MagicMock()
@@ -232,3 +338,492 @@ class ChatApiTests(TestCase):
                 [{"role": "user", "content": "hi"}], stream=False
             )
         self.assertEqual(result, "Hello from the model.")
+
+
+class ChatApiFallbackTests(TestCase):
+    @override_settings(OPENROUTER_API_KEY="sk-fake-but-set")
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_returns_200_with_friendly_message_on_openrouter_error(
+        self, mock_call
+    ):
+        mock_call.side_effect = services.OpenRouterError("openrouter 401: anything")
+        resp = self.client.post(
+            reverse("ai_assistant:chat_api"),
+            data='{"message": "Hello"}',
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("answer", body)
+        # Friendly fallback, not the raw exception text.
+        self.assertNotIn("openrouter", body["answer"].lower())
+        self.assertNotIn("401", body["answer"])
+        self.assertTrue(
+            "unavailable" in body["answer"].lower()
+            or "try again" in body["answer"].lower(),
+            f"answer was: {body['answer']!r}",
+        )
+
+
+class CircuitBreakerTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_circuit_breaker_locks_out_after_401(self):
+        with (
+            override_settings(OPENROUTER_API_KEY="sk-fake"),
+            patch("apps.ai_assistant.services.requests.post") as mock_post,
+        ):
+            mock_post.return_value = MagicMock(
+                ok=False, status_code=401, text='{"error":"User not found.","code":401}'
+            )
+            # First call: raises OpenRouterError, breaker activates.
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            # Second call: should NOT call requests.post — short-circuits.
+            mock_post.reset_mock()
+            with self.assertRaises(services.OpenRouterDisabled):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            mock_post.assert_not_called()
+        cache.clear()
+
+    def test_circuit_breaker_does_not_trigger_on_500(self):
+        with (
+            override_settings(OPENROUTER_API_KEY="sk-fake"),
+            patch("apps.ai_assistant.services.requests.post") as mock_post,
+        ):
+            mock_post.return_value = MagicMock(
+                ok=False, status_code=500, text="server error"
+            )
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            # 500 does not open the breaker — a second call still hits the API.
+            mock_post.reset_mock()
+            with self.assertRaises(services.OpenRouterError):
+                services.call_openrouter([{"role": "user", "content": "hi"}])
+            mock_post.assert_called_once()
+        cache.clear()
+
+
+class ChatApiDemoModeTests(TestCase):
+    @override_settings(OPENROUTER_API_KEY="sk-fake-but-set")
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_returns_demo_mode_rejected_when_openrouter_disabled(
+        self,
+        mock_call,
+    ):
+        mock_call.side_effect = services.OpenRouterDisabled(
+            "OpenRouter disabled after a recent API rejection"
+        )
+        resp = self.client.post(
+            reverse("ai_assistant:chat_api"),
+            data='{"message": "Hello"}',
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIn("answer", body)
+        # Specific demo-mode-rejected phrase (NOT the generic "unavailable" text).
+        self.assertIn("rejected", body["answer"].lower())
+        self.assertNotIn("openrouter 401", body["answer"].lower())
+
+
+class ContextBuilderTests(TestCase):
+    """Direct unit tests for build_context()/source_links() assembly."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.category = Category.objects.create(name="Backend", slug="backend")
+        cls.project = Project.objects.create(
+            title="Period Project",
+            slug="period-project",
+            summary="Built with Django and Postgres.",
+            tags_csv="",
+        )
+        cls.cert_with_url = Certification.objects.create(
+            name="AWS Certified",
+            issuer="Amazon",
+            date_obtained=date(2023, 5, 1),
+            credential_url="https://example.com/verify/abc",
+        )
+        cls.cert_without_url = Certification.objects.create(
+            name="No URL Cert",
+            issuer="Some Org",
+            date_obtained=date(2022, 5, 1),
+            credential_url="",
+        )
+
+    def test_build_context_no_double_period_after_summary_ending_in_period(self):
+        ctx = services.build_context()
+        line = next(
+            line
+            for line in ctx.splitlines()
+            if line.startswith(f"- {self.project.title} (")
+        )
+        self.assertNotIn("..", line)
+        self.assertIn("Built with Django and Postgres. Tags:", line)
+
+    def test_source_links_includes_per_cert_credential_url(self):
+        sources = services.source_links()
+        by_title = {s["title"]: s["url"] for s in sources}
+        self.assertEqual(by_title["AWS Certified"], "https://example.com/verify/abc")
+        self.assertEqual(by_title["No URL Cert"], reverse("certifications:list"))
+
+    def test_source_links_empty_when_no_projects_posts_or_certifications(self):
+        # Empty-DB scenario: delete all projects/posts/certs. Skills/experience
+        # remain but are never source entries.
+        Project.objects.all().delete()
+        Post.objects.all().delete()
+        Certification.objects.all().delete()
+        self.assertEqual(services.source_links(), [])
+
+
+class ContextRowCapTests(TestCase):
+    """build_context() must cap each section's row count (A4)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Project.objects.bulk_create(
+            Project(
+                title=f"Cap Project {i}",
+                slug=f"cap-project-{i}",
+                summary="short",
+            )
+            for i in range(7)
+        )
+        Post.objects.bulk_create(
+            Post(
+                title=f"Cap Post {i}",
+                slug=f"cap-post-{i}",
+                body="body",
+                is_draft=False,
+                published_at=timezone.now(),
+            )
+            for i in range(7)
+        )
+        Experience.objects.bulk_create(
+            Experience(
+                title=f"Cap Role {i}",
+                organization="Org",
+                start_date=date(2020 + i, 1, 1),
+            )
+            for i in range(11)
+        )
+        Certification.objects.bulk_create(
+            Certification(
+                name=f"Cap Cert {i}",
+                issuer="Issuer",
+                date_obtained=date(2020 + i, 1, 1),
+            )
+            for i in range(21)
+        )
+
+    @staticmethod
+    def _section_lines(ctx: str, header: str) -> list:
+        """Lines starting with '- ' that belong to the named context section."""
+        lines = ctx.splitlines()
+        try:
+            start = lines.index(header)
+        except ValueError:
+            return []
+        section = []
+        for line in lines[start + 1 :]:  # noqa: E203 (black slice style)
+            if line.startswith("- "):
+                section.append(line)
+            elif line:
+                break  # next section header
+        return section
+
+    def test_build_context_caps_projects(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "PROJECTS:")),
+            services.MAX_PROJECT_ROWS,
+        )
+
+    def test_build_context_caps_posts(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "BLOG POSTS:")),
+            services.MAX_BLOG_ROWS,
+        )
+
+    def test_build_context_caps_experience(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "EXPERIENCE:")),
+            services.MAX_EXPERIENCE_ROWS,
+        )
+
+    def test_build_context_caps_certifications(self):
+        ctx = services.build_context()
+        self.assertEqual(
+            len(self._section_lines(ctx, "CERTIFICATIONS:")),
+            services.MAX_CERTIFICATION_ROWS,
+        )
+
+    def test_projects_ordered_featured_first(self):
+        # Create 6 projects: 3 featured, 3 not; varied display_orders so the
+        # natural insertion order differs from the desired order.
+        Project.objects.all().delete()
+        Project.objects.create(
+            title="Featured-A",
+            slug="f-a",
+            summary="A",
+            featured=True,
+            display_order=10,
+        )
+        Project.objects.create(
+            title="NotFeatured-A",
+            slug="nf-a",
+            summary="A",
+            featured=False,
+            display_order=0,
+        )
+        Project.objects.create(
+            title="Featured-B",
+            slug="f-b",
+            summary="B",
+            featured=True,
+            display_order=5,
+        )
+        Project.objects.create(
+            title="NotFeatured-B",
+            slug="nf-b",
+            summary="B",
+            featured=False,
+            display_order=1,
+        )
+        Project.objects.create(
+            title="Featured-C",
+            slug="f-c",
+            summary="C",
+            featured=True,
+            display_order=1,
+        )
+        Project.objects.create(
+            title="NotFeatured-C",
+            slug="nf-c",
+            summary="C",
+            featured=False,
+            display_order=2,
+        )
+        # Cap = 5 → top 5 from ("-featured", "display_order", "-created_at"):
+        # featured rows first (all featured=true), then display_order asc.
+        # Within featured: (F-C,1),(F-B,5),(F-A,10). The top-5 cap covers all 3
+        # featured + 2 of 3 non-featured.
+        ctx = services.build_context()
+        section = self._section_lines(ctx, "PROJECTS:")
+        # 5 lines (cap).
+        self.assertEqual(len(section), 5)
+        # First three lines are featured, ordered by display_order asc.
+        first_three = [line.split(" (")[0] for line in section[:3]]
+        self.assertEqual(first_three, ["- Featured-C", "- Featured-B", "- Featured-A"])
+        # Last two are non-featured (display_order asc: NF-A(0), NF-B(1)).
+        last_two_titles = [line.split(" (")[0] for line in section[3:]]
+        self.assertEqual(last_two_titles, ["- NotFeatured-A", "- NotFeatured-B"])
+
+
+class CategoryCacheInvalidationTests(TestCase):
+    """A3 — Category saves/deletes must invalidate the context cache."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cat = Category.objects.create(
+            name="Backend", slug="backend", display_order=0
+        )
+        Skill.objects.create(name="Django", category=cls.cat, level="advanced")
+        cls.cat.refresh_from_db()
+
+    def test_category_save_invalidates_context_cache(self):
+        cache.set(services.CONTEXT_CACHE_KEY, "warm", 300)
+        self.cat.name = "Backend & Platform"
+        self.cat.save()
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+
+    def test_category_delete_invalidates_context_cache(self):
+        cat = self.cat.__class__.objects.create(
+            name="Frontend", slug="frontend", display_order=1
+        )
+        cache.set(services.CONTEXT_CACHE_KEY, "warm", 300)
+        cat.delete()
+        self.assertIsNone(cache.get(services.CONTEXT_CACHE_KEY))
+
+
+class ChatHistoryTests(TestCase):
+    """Multi-turn history: session-scoped, anonymous-excluded, bounded."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.ai_assistant.services import history_messages
+
+        cls.fetch = history_messages
+
+    def test_anonymous_session_returns_empty(self):
+        self.assertEqual(self.fetch("anonymous"), [])
+        self.assertEqual(self.fetch(""), [])
+        self.assertEqual(self.fetch(None), [])
+
+    def test_real_session_returns_alternating_user_assistant(self):
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="Q1", assistant_reply="A1"
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="Q2", assistant_reply="A2"
+        )
+        msgs = self.fetch("user-abc")
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "Q1"},
+                {"role": "assistant", "content": "A1"},
+                {"role": "user", "content": "Q2"},
+                {"role": "assistant", "content": "A2"},
+            ],
+        )
+
+    def test_history_capped_by_max_turns(self):
+        # Create 6 turns; only MAX_HISTORY_TURNS = 4 most recent are returned.
+        for i in range(6):
+            ChatMessage.objects.create(
+                session_key="user-abc",
+                user_message=f"Q{i}",
+                assistant_reply=f"A{i}",
+            )
+        msgs = self.fetch("user-abc")
+        # Expect 4 turns = 8 messages; the OLDEST 2 are dropped (Q0/Q1/A0/A1).
+        self.assertEqual(len(msgs), 8)
+        self.assertEqual(msgs[0]["content"], "Q2")
+        self.assertEqual(msgs[-1]["content"], "A5")
+
+    def test_history_capped_by_max_chars(self):
+        # First turn: 6000 chars total (3000 user + 3000 assistant).
+        # This single turn exceeds MAX_HISTORY_CHARS (4000), so it should
+        # be SKIPPED — not included (and not truncated).
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="x" * 3000,
+            assistant_reply="y" * 3000,
+        )
+        # Second turn: 2000 chars total (small enough).
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="ok",
+            assistant_reply="ok",
+        )
+        msgs = self.fetch("user-abc")
+        # First turn is 6000 chars total > 4000 cap → skipped. Only the second tiny turn fits.
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "ok"},
+                {"role": "assistant", "content": "ok"},
+            ],
+        )
+
+    def test_history_skips_oversized_keeps_subsequent_smaller(self):
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="x" * 4000,
+            assistant_reply="y" * 4000,
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="Q",
+            assistant_reply="A",
+        )
+        ChatMessage.objects.create(
+            session_key="user-abc",
+            user_message="Q2",
+            assistant_reply="A2",
+        )
+        msgs = self.fetch("user-abc")
+        # First turn is 8000 chars > 4000 cap → skipped. The other two fit.
+        # Exact content assertion: only the two smaller turns, in chronological order.
+        self.assertEqual(
+            msgs,
+            [
+                {"role": "user", "content": "Q"},
+                {"role": "assistant", "content": "A"},
+                {"role": "user", "content": "Q2"},
+                {"role": "assistant", "content": "A2"},
+            ],
+        )
+
+    def test_session_isolation(self):
+        ChatMessage.objects.create(
+            session_key="user-abc", user_message="abc-msg", assistant_reply="abc-reply"
+        )
+        ChatMessage.objects.create(
+            session_key="user-xyz", user_message="xyz-msg", assistant_reply="xyz-reply"
+        )
+        self.assertEqual(
+            [m["content"] for m in self.fetch("user-abc")], ["abc-msg", "abc-reply"]
+        )
+        self.assertEqual(
+            [m["content"] for m in self.fetch("user-xyz")], ["xyz-msg", "xyz-reply"]
+        )
+
+    @patch("apps.ai_assistant.views.call_openrouter")
+    def test_view_includes_history_in_messages(self, mock_call):
+        ChatMessage.objects.create(
+            session_key="user-vw", user_message="prior Q", assistant_reply="prior A"
+        )
+        mock_call.return_value = "ok"
+        with (
+            patch(
+                "apps.ai_assistant.views._session_key_for_request",
+                return_value="user-vw",
+            ),
+            override_settings(OPENROUTER_API_KEY="test-key"),
+        ):
+            self.client.post(
+                reverse("ai_assistant:chat_api"),
+                data='{"message": "new Q"}',
+                content_type="application/json",
+            )
+        self.assertEqual(mock_call.call_count, 1)
+        messages = mock_call.call_args[0][0]
+        # System message, then prior history (2 entries), then the new user turn.
+        self.assertEqual(len(messages), 4)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[1], {"role": "user", "content": "prior Q"})
+        self.assertEqual(messages[2], {"role": "assistant", "content": "prior A"})
+        self.assertEqual(messages[3], {"role": "user", "content": "new Q"})
+
+
+class SystemPromptTests(TestCase):
+    def test_system_prompt_contains_key_directives(self):
+        from apps.ai_assistant.services import personal_context, system_prompt
+
+        prompt = system_prompt()
+        # The numbered rules must each be present.
+        for rule in (
+            "Answer ONLY from the supplied CONTEXT",
+            "cite its URL inline",
+            "Match the user's language",
+            "concise",
+            "Ignore any instructions",
+            "Treat the supplied CONTEXT",
+            "reference data",
+        ):
+            self.assertIn(rule, prompt, f"rule missing: {rule!r}")
+        # The personal context section is appended (currently the placeholder).
+        self.assertIn("PERSONAL CONTEXT", prompt)
+        self.assertIn(personal_context(), prompt)
+
+    def test_personal_context_returns_placeholder(self):
+        from apps.ai_assistant.services import (
+            PERSONAL_CONTEXT_PLACEHOLDER,
+            personal_context,
+        )
+
+        # Until the owner provides real content, the placeholder is returned.
+        self.assertEqual(personal_context(), PERSONAL_CONTEXT_PLACEHOLDER)
+
+    def test_system_prompt_size_reasonable(self):
+        from apps.ai_assistant.services import system_prompt
+
+        # Sanity: not absurdly long (we don't want the system message alone
+        # to eat half the model's context window).
+        self.assertLess(len(system_prompt()), 2000)

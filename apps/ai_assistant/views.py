@@ -13,7 +13,11 @@ from apps.ai_assistant.constants import (
     RATE_LIMIT_TTL,
 )
 from apps.ai_assistant.models import ChatMessage
-from apps.ai_assistant.services import call_openrouter
+from apps.ai_assistant.services import (
+    OpenRouterDisabled,
+    OpenRouterError,
+    call_openrouter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,10 @@ def _client_ip(request) -> str:
         xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
         return xff.split(",")[0].strip() or request.META.get("REMOTE_ADDR", "")
     return request.META.get("REMOTE_ADDR", "")
+
+
+def _session_key_for_request(request) -> str:
+    return request.session.session_key or "anonymous"
 
 
 def _rate_limited(ip: str) -> bool:
@@ -62,12 +70,15 @@ def chat_api(request):
             {"error": "Rate limit exceeded. Please try again later."}, status=429
         )
 
+    session_key = _session_key_for_request(request)
+    history = services.history_messages(session_key)
     context = services.get_context()
     messages = [
         {
             "role": "system",
             "content": services.system_prompt() + "\n\nCONTEXT:\n" + context,
         },
+        *history,
         {"role": "user", "content": message},
     ]
 
@@ -77,16 +88,26 @@ def chat_api(request):
     else:
         try:
             answer = call_openrouter(messages, stream=False)
-        except Exception:
+        except OpenRouterDisabled:
+            # Known-bad key (recent 401/402/403) — don't call the API again;
+            # explain transparently instead of a generic error.
+            logger.warning("OpenRouter disabled; serving demo-mode answer")
+            answer = services.demo_mode_answer_rejected()
+        except OpenRouterError:
             logger.exception("OpenRouter call failed")
             answer = (
                 "Sorry, the assistant is temporarily unavailable. "
                 "Please try again later."
             )
+        except Exception:
+            logger.exception("Unexpected error in chat")
+            answer = (
+                "Sorry, the assistant is temporarily unavailable. "
+                "Please try again later."
+            )
 
-    sources = services.source_links()
+    sources = services.extract_cited_sources(answer)
 
-    session_key = request.session.session_key or "anonymous"
     ChatMessage.objects.create(
         session_key=session_key,
         user_message=message,
